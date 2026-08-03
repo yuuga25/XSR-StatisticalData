@@ -82,7 +82,7 @@
       elements.togglePassword.setAttribute('aria-label', isPassword ? 'パスワードを隠す' : 'パスワードを表示');
     });
 
-    elements.encryptedFileInput.addEventListener('change', async (event) => {
+    elements.encryptedFileInput?.addEventListener('change', async (event) => {
       const file = event.target.files?.[0];
       if (!file) return;
       state.encryptedBuffer = await file.arrayBuffer();
@@ -90,8 +90,8 @@
     });
 
     elements.lockButton.addEventListener('click', lockApp);
-    elements.reloadDataButton.addEventListener('click', () => elements.localXlsxInput.click());
-    elements.localXlsxInput.addEventListener('change', handleLocalWorkbook);
+    elements.reloadDataButton?.addEventListener('click', () => elements.localXlsxInput?.click());
+    elements.localXlsxInput?.addEventListener('change', handleLocalWorkbook);
 
     elements.sidebarToggle.addEventListener('click', () => elements.sidebar.classList.toggle('is-open'));
 
@@ -488,8 +488,8 @@
         <article class="deck-card ${selected ? 'is-selected' : ''}">
           <div class="deck-rank">#${deck.rank}</div>
           <div class="deck-main">
-            <div class="deck-main__leaders">${deck.leaders.map(name => `<span class="tag">${escapeHtml(name)}</span>`).join('')}</div>
-            <div class="deck-main__aces">${deck.aces.map(name => `<span class="tag tag--ace">${escapeHtml(name)}</span>`).join('')}</div>
+            <div class="deck-main__leaders">${deck.leaders.map(name => cardChip(name, 'leader')).join('')}</div>
+            <div class="deck-main__aces">${deck.aces.map(name => cardChip(name, 'ace')).join('')}</div>
           </div>
           <div class="deck-metrics">
             <div class="deck-metric"><span>試合</span><strong>${formatInt(deck.games)}</strong></div>
@@ -606,6 +606,22 @@
     `);
   }
 
+  function cardInfo(name) {
+    return (window.XROSS_CARD_MAP || {})[String(name || '').trim()] || null;
+  }
+
+  function cardImage(name, size = 'md') {
+    const info = cardInfo(name);
+    const safeName = escapeHtml(name || 'Unknown');
+    if (!info) return `<span class="card-thumb card-thumb--${size} card-thumb--fallback"><b>${safeName.slice(0,1)}</b></span>`;
+    const src = `assets/cards/${encodeURIComponent(info.folder)}/${encodeURIComponent(info.id)}.png`;
+    return `<span class="card-thumb card-thumb--${size}"><img src="${src}" alt="${safeName}" loading="lazy" onerror="this.parentElement.classList.add('card-thumb--fallback');this.remove()"><b>${safeName.slice(0,1)}</b></span>`;
+  }
+
+  function cardChip(name, kind = '') {
+    return `<span class="visual-card-chip ${kind ? `visual-card-chip--${kind}` : ''}">${cardImage(name, 'sm')}<span>${escapeHtml(name)}</span></span>`;
+  }
+
   function bindCardEvents() {
     $('#cardTypeTabs').addEventListener('click', event => {
       const button = event.target.closest('[data-card-type]');
@@ -634,7 +650,7 @@
     $('#cardResultCount').innerHTML = `<span>表示件数</span><strong>${formatInt(list.length)}</strong>`;
     $('#cardStatsList').innerHTML = list.length ? list.map((item, index) => `
       <article class="stat-row">
-        <div class="stat-row__name"><div class="stat-row__name-inner"><span class="stat-row__rank">${index + 1}</span><strong>${escapeHtml(item.name)}</strong></div></div>
+        <div class="stat-row__name"><div class="stat-row__name-inner"><span class="stat-row__rank">${index + 1}</span>${cardImage(item.name, 'md')}<strong>${escapeHtml(item.name)}</strong></div></div>
         <div class="stat-row__bar">
           <div class="stat-row__bar-head"><span>${state.cardType === 'tactic' ? '使用率' : '採用率'}</span><strong>${percent(item.adoptionRate, 1)}</strong></div>
           <div class="rate-track"><div class="rate-track__fill" style="--value:${item.adoptionRate / maxAdoption * 100}%"></div></div>
@@ -692,7 +708,7 @@
     const [leaders = deck, aces = ''] = deck.split(' ＋ ');
     $('#tacticDeckSummary').innerHTML = `
       <div class="selected-deck__top">
-        <div><p class="eyebrow">SELECTED DECK</p><h3>${escapeHtml(leaders)}</h3><p>${escapeHtml(aces)}</p></div>
+        <div><p class="eyebrow">SELECTED DECK</p><div class="selected-deck__cards">${leaders.split(" / ").filter(Boolean).map(name => cardChip(name, "leader")).join("")}${aces.split(" / ").filter(Boolean).map(name => cardChip(name, "ace")).join("")}</div><h3>${escapeHtml(leaders)}</h3><p>${escapeHtml(aces)}</p></div>
         <div class="selected-deck__count">${formatInt(totalUses)}<small style="font-size:9px;color:var(--muted);display:block;text-align:right">使用</small></div>
       </div>`;
     $('#tacticSequenceList').innerHTML = rows.length ? rows.map((item, index) => {

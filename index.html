@@ -42,11 +42,7 @@
       </form>
 
       <p id="authMessage" class="auth-message" role="status" aria-live="polite"></p>
-      <div class="auth-divider"><span>または</span></div>
-      <label class="secondary-button file-button">
-        暗号化データを選ぶ
-        <input id="encryptedFileInput" type="file" accept=".enc,application/octet-stream" hidden>
-      </label>
+</label>
       <p class="auth-card__note">データはブラウザ内で復号され、外部へ送信されない。</p>
     </div>
   </section>
@@ -64,9 +60,7 @@
       <div class="topbar__meta">
         <span id="syncStatus" class="status-pill"><i></i>データ読込済み</span>
         <span id="topLastUpdated" class="topbar__date"></span>
-        <button id="reloadDataButton" class="icon-button topbar__action" type="button" title="別のExcelを一時読込">Excel</button>
-        <input id="localXlsxInput" type="file" accept=".xlsx,.xls" hidden>
-        <button id="lockButton" class="icon-button topbar__action" type="button" title="ロックする">Lock</button>
+<button id="lockButton" class="icon-button topbar__action" type="button" title="ロックする">Lock</button>
       </div>
     </header>
 
@@ -90,9 +84,6 @@
           </button>
           <button class="nav-item" type="button" data-view="raw">
             <span class="nav-item__icon">⌗</span><span>全データ</span>
-          </button>
-          <button class="nav-item" type="button" data-view="about">
-            <span class="nav-item__icon">i</span><span>更新方法</span>
           </button>
         </nav>
         <div class="sidebar__footer">
@@ -308,39 +299,6 @@
             <div id="rawPagination" class="pagination"></div>
           </div>
         </section>
-
-        <section id="view-about" class="view" data-view-panel="about">
-          <div class="page-heading reveal">
-            <div>
-              <p class="eyebrow">MAINTENANCE</p>
-              <h2>Excel更新と公開方法</h2>
-              <p class="page-heading__description">同じ形のExcelなら、暗号化データを差し替えるだけで表示が更新される。</p>
-            </div>
-          </div>
-
-          <div class="guide-grid reveal">
-            <article class="guide-card glass-card"><span>01</span><h3>Excelを更新</h3><p>集計用の.xlsxをいつも通り更新して保存。シート名と列構成は維持する。</p></article>
-            <article class="guide-card glass-card"><span>02</span><h3>暗号化する</h3><p><code>tools/update-data.html</code>を開き、Excelと共通パスワードから新しい<code>data.enc</code>を作る。</p></article>
-            <article class="guide-card glass-card"><span>03</span><h3>差し替えて公開</h3><p>GitHub上の<code>data.enc</code>だけを置き換えてpush。GitHub Pagesへ自動反映される。</p></article>
-          </div>
-
-          <div class="dashboard-grid dashboard-grid--two reveal">
-            <article class="panel glass-card">
-              <div class="panel__heading"><div><p class="eyebrow">SECURITY</p><h3>この方式で守れる範囲</h3></div></div>
-              <div class="prose">
-                <p>Excelの中身はAES-GCMで暗号化され、パスワード自体はサイト内に保存しない。リポジトリには生のExcelを置かない。</p>
-                <p>ただし、共通パスワードを知る人はデータを閲覧・復号できる。パスワードが漏れた場合は、新しいパスワードで<code>data.enc</code>を作り直す。</p>
-              </div>
-            </article>
-            <article class="panel glass-card">
-              <div class="panel__heading"><div><p class="eyebrow">LOCAL PREVIEW</p><h3>公開前の確認</h3></div></div>
-              <div class="prose">
-                <p>このページ上部の「Excel」から、更新した.xlsxを一時的に読み込んで表示確認できる。ファイルはアップロードされず、このブラウザ内だけで処理される。</p>
-                <p>GitHub Pagesと同じ状態を確認する場合は、フォルダ内でローカルHTTPサーバーを起動する。</p>
-              </div>
-            </article>
-          </div>
-        </section>
       </main>
     </div>
 
@@ -349,7 +307,6 @@
       <button type="button" data-view="decks"><span>▱</span>デッキ</button>
       <button type="button" data-view="cards"><span>◇</span>カード</button>
       <button type="button" data-view="logs"><span>≡</span>ログ</button>
-      <button type="button" data-view="about"><span>•••</span>その他</button>
     </nav>
   </div>
 
@@ -363,6 +320,7 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <script src="card-map.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>
