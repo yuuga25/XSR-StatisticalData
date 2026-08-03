@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#08110f">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Xross Stars 対戦統計ダッシュボード">
+  <title>Xross Stats Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <span class="ambient__orb ambient__orb--one"></span>
+    <span class="ambient__orb ambient__orb--two"></span>
+    <span class="ambient__grid"></span>
+  </div>
+
+  <section id="authScreen" class="auth-screen" aria-labelledby="authTitle">
+    <div class="auth-card glass-card">
+      <div class="auth-card__mark" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <p class="eyebrow">PRIVATE ANALYTICS</p>
+      <h1 id="authTitle">Xross Stats</h1>
+      <p class="auth-card__lead">共通パスワードで暗号化された統計データを開く。</p>
+
+      <form id="authForm" class="auth-form" novalidate>
+        <label class="field-label" for="passwordInput">パスワード</label>
+        <div class="password-field">
+          <input id="passwordInput" name="password" type="password" autocomplete="current-password" placeholder="共通パスワードを入力" required>
+          <button id="togglePassword" class="icon-button" type="button" aria-label="パスワードを表示">表示</button>
+        </div>
+        <label class="check-row">
+          <input id="rememberSession" type="checkbox" checked>
+          <span>このタブを閉じるまで保持</span>
+        </label>
+        <button id="unlockButton" class="primary-button" type="submit">
+          <span class="primary-button__label">統計を開く</span>
+          <span class="primary-button__loader" aria-hidden="true"></span>
+        </button>
+      </form>
+
+      <p id="authMessage" class="auth-message" role="status" aria-live="polite"></p>
+      <div class="auth-divider"><span>または</span></div>
+      <label class="secondary-button file-button">
+        暗号化データを選ぶ
+        <input id="encryptedFileInput" type="file" accept=".enc,application/octet-stream" hidden>
+      </label>
+      <p class="auth-card__note">データはブラウザ内で復号され、外部へ送信されない。</p>
+    </div>
+  </section>
+
+  <div id="app" class="app" hidden>
+    <header class="topbar">
+      <button id="sidebarToggle" class="topbar__menu icon-button" type="button" aria-label="メニューを開く">☰</button>
+      <a class="brand" href="#overview" aria-label="概要へ移動">
+        <span class="brand__symbol"><i></i><i></i><i></i></span>
+        <span>
+          <strong>Xross Stats</strong>
+          <small>Competitive dashboard</small>
+        </span>
+      </a>
+      <div class="topbar__meta">
+        <span id="syncStatus" class="status-pill"><i></i>データ読込済み</span>
+        <span id="topLastUpdated" class="topbar__date"></span>
+        <button id="reloadDataButton" class="icon-button topbar__action" type="button" title="別のExcelを一時読込">Excel</button>
+        <input id="localXlsxInput" type="file" accept=".xlsx,.xls" hidden>
+        <button id="lockButton" class="icon-button topbar__action" type="button" title="ロックする">Lock</button>
+      </div>
+    </header>
+
+    <div class="app-shell">
+      <aside id="sidebar" class="sidebar">
+        <nav class="nav-list" aria-label="メインナビゲーション">
+          <button class="nav-item is-active" type="button" data-view="overview">
+            <span class="nav-item__icon">◫</span><span>概要</span>
+          </button>
+          <button class="nav-item" type="button" data-view="decks">
+            <span class="nav-item__icon">▱</span><span>デッキ</span>
+          </button>
+          <button class="nav-item" type="button" data-view="cards">
+            <span class="nav-item__icon">◇</span><span>カード統計</span>
+          </button>
+          <button class="nav-item" type="button" data-view="tactics">
+            <span class="nav-item__icon">↳</span><span>戦術構成</span>
+          </button>
+          <button class="nav-item" type="button" data-view="logs">
+            <span class="nav-item__icon">≡</span><span>対戦ログ</span>
+          </button>
+          <button class="nav-item" type="button" data-view="raw">
+            <span class="nav-item__icon">⌗</span><span>全データ</span>
+          </button>
+          <button class="nav-item" type="button" data-view="about">
+            <span class="nav-item__icon">i</span><span>更新方法</span>
+          </button>
+        </nav>
+        <div class="sidebar__footer">
+          <span>DATA SOURCE</span>
+          <strong id="sourceFileName">—</strong>
+          <small id="sidebarPeriod">—</small>
+        </div>
+      </aside>
+
+      <main id="mainContent" class="main-content">
+        <section id="view-overview" class="view is-active" data-view-panel="overview">
+          <div class="page-heading reveal">
+            <div>
+              <p class="eyebrow">OVERVIEW</p>
+              <h2>対戦環境を、ひと目で。</h2>
+              <p id="overviewDescription" class="page-heading__description"></p>
+            </div>
+            <div class="page-heading__badge">
+              <span>集計期間</span>
+              <strong id="overviewPeriod">—</strong>
+            </div>
+          </div>
+
+          <div id="kpiGrid" class="kpi-grid reveal"></div>
+
+          <div class="dashboard-grid dashboard-grid--two reveal">
+            <article class="panel glass-card">
+              <div class="panel__heading">
+                <div><p class="eyebrow">TURN ORDER</p><h3>先攻 / 後攻</h3></div>
+                <span class="panel__hint">勝率比較</span>
+              </div>
+              <div id="firstSecondChart" class="rate-comparison"></div>
+            </article>
+
+            <article class="panel glass-card">
+              <div class="panel__heading">
+                <div><p class="eyebrow">ROUND FLOW</p><h3>進行別の勝率</h3></div>
+                <span class="panel__hint">1R基準</span>
+              </div>
+              <div id="leadChart" class="lead-chart"></div>
+            </article>
+          </div>
+
+          <div class="dashboard-grid dashboard-grid--wide reveal">
+            <article class="panel glass-card">
+              <div class="panel__heading">
+                <div><p class="eyebrow">TOP DECKS</p><h3>信頼下限ランキング</h3></div>
+                <button class="text-button" type="button" data-jump-view="decks">すべて見る →</button>
+              </div>
+              <div id="overviewDecks" class="compact-ranking"></div>
+            </article>
+
+            <article class="panel glass-card">
+              <div class="panel__heading">
+                <div><p class="eyebrow">PICK TRENDS</p><h3>採用の中心</h3></div>
+                <button class="text-button" type="button" data-jump-view="cards">詳しく見る →</button>
+              </div>
+              <div id="overviewPicks" class="pick-columns"></div>
+            </article>
+          </div>
+
+          <article class="panel glass-card reveal">
+            <div class="panel__heading">
+              <div><p class="eyebrow">NOTES</p><h3>集計条件・定義</h3></div>
+            </div>
+            <div id="summaryNotes" class="notes-grid"></div>
+          </article>
+        </section>
+
+        <section id="view-decks" class="view" data-view-panel="decks">
+          <div class="page-heading reveal">
+            <div>
+              <p class="eyebrow">DECK ANALYSIS</p>
+              <h2>デッキランキング</h2>
+              <p class="page-heading__description">総合・勝ち進行・負け進行を切り替えて、構成や近いデッキを比較。</p>
+            </div>
+            <div id="deckResultCount" class="page-heading__badge page-heading__badge--number"></div>
+          </div>
+
+          <div class="toolbar glass-card reveal">
+            <div class="segmented" id="deckSheetTabs">
+              <button class="is-active" type="button" data-deck-sheet="all">総合</button>
+              <button type="button" data-deck-sheet="win">勝ち進行</button>
+              <button type="button" data-deck-sheet="lose">負け進行</button>
+            </div>
+            <label class="search-field">
+              <span>⌕</span>
+              <input id="deckSearch" type="search" placeholder="リーダー・ACEで検索">
+            </label>
+            <label class="compact-field">
+              <span>最低試合数</span>
+              <input id="deckMinGames" type="number" min="0" step="1" value="5">
+            </label>
+            <label class="compact-field">
+              <span>並び順</span>
+              <select id="deckSort">
+                <option value="confidence">信頼下限</option>
+                <option value="winrate">勝率</option>
+                <option value="games">試合数</option>
+                <option value="wins">勝数</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="compareBar" class="compare-bar glass-card" hidden>
+            <div><strong id="compareCount">0</strong><span>件を比較中</span></div>
+            <div id="compareChips" class="compare-chips"></div>
+            <button id="clearCompare" class="secondary-button" type="button">選択解除</button>
+          </div>
+
+          <div id="deckList" class="deck-list reveal"></div>
+          <div class="center-action"><button id="loadMoreDecks" class="secondary-button" type="button">さらに表示</button></div>
+        </section>
+
+        <section id="view-cards" class="view" data-view-panel="cards">
+          <div class="page-heading reveal">
+            <div>
+              <p class="eyebrow">CARD STATS</p>
+              <h2>単体採用率・勝率</h2>
+              <p class="page-heading__description">リーダー、ACE、タクティクスを同じ尺度で確認。</p>
+            </div>
+            <div id="cardResultCount" class="page-heading__badge page-heading__badge--number"></div>
+          </div>
+
+          <div class="toolbar glass-card reveal">
+            <div class="segmented" id="cardTypeTabs">
+              <button class="is-active" type="button" data-card-type="leader">リーダー</button>
+              <button type="button" data-card-type="ace">ACE</button>
+              <button type="button" data-card-type="tactic">タクティクス</button>
+            </div>
+            <label class="search-field">
+              <span>⌕</span>
+              <input id="cardSearch" type="search" placeholder="名前で検索">
+            </label>
+            <label class="compact-field">
+              <span>並び順</span>
+              <select id="cardSort">
+                <option value="adoption">採用率 / 使用率</option>
+                <option value="winrate">勝率</option>
+                <option value="games">試合数</option>
+                <option value="count">採用数 / 使用数</option>
+              </select>
+            </label>
+          </div>
+          <div id="cardStatsList" class="stat-list reveal"></div>
+        </section>
+
+        <section id="view-tactics" class="view" data-view-panel="tactics">
+          <div class="page-heading reveal">
+            <div>
+              <p class="eyebrow">TACTICS ORDER</p>
+              <h2>デッキ別タクティクス</h2>
+              <p class="page-heading__description">Excel上で崩れていた選択表を、元データから検索できる形に再構成。</p>
+            </div>
+            <div id="tacticDeckCount" class="page-heading__badge page-heading__badge--number"></div>
+          </div>
+
+          <div class="toolbar glass-card reveal toolbar--stack-mobile">
+            <label class="search-field search-field--wide">
+              <span>⌕</span>
+              <input id="tacticDeckSearch" type="search" list="tacticDeckOptions" placeholder="デッキのリーダー・ACEを入力">
+              <datalist id="tacticDeckOptions"></datalist>
+            </label>
+            <button id="showPopularTacticDeck" class="secondary-button" type="button">使用数最多を表示</button>
+          </div>
+
+          <article id="tacticDeckSummary" class="selected-deck glass-card reveal"></article>
+          <div id="tacticSequenceList" class="sequence-list reveal"></div>
+        </section>
+
+        <section id="view-logs" class="view" data-view-panel="logs">
+          <div class="page-heading reveal">
+            <div>
+              <p class="eyebrow">MATCH LOGS</p>
+              <h2>対戦ログ</h2>
+              <p class="page-heading__description">大会・ユーザー・構成・メモを横断検索。全25列を確認できる。</p>
+            </div>
+            <div id="logResultCount" class="page-heading__badge page-heading__badge--number"></div>
+          </div>
+
+          <div class="toolbar glass-card reveal toolbar--logs">
+            <label class="search-field search-field--wide">
+              <span>⌕</span>
+              <input id="logSearch" type="search" placeholder="大会名・ユーザー・カード・メモを検索">
+            </label>
+            <label class="compact-field"><span>先後</span><select id="logTurnFilter"><option value="">すべて</option><option>先攻</option><option>後攻</option></select></label>
+            <label class="compact-field"><span>結果</span><select id="logResultFilter"><option value="">すべて</option><option>勝</option><option>負</option></select></label>
+            <label class="compact-field"><span>進行</span><select id="logLeadFilter"><option value="">すべて</option><option>勝ち進行</option><option>負け進行</option></select></label>
+          </div>
+
+          <div class="table-panel glass-card reveal">
+            <div id="logTableWrap" class="data-table-wrap"></div>
+            <div id="logMobileCards" class="log-mobile-cards"></div>
+            <div id="logPagination" class="pagination"></div>
+          </div>
+        </section>
+
+        <section id="view-raw" class="view" data-view-panel="raw">
+          <div class="page-heading reveal">
+            <div>
+              <p class="eyebrow">ALL SHEETS</p>
+              <h2>全データ</h2>
+              <p class="page-heading__description">暗号化データに含まれる全シートを、行・列を省略せず確認。</p>
+            </div>
+            <div id="rawSheetSize" class="page-heading__badge page-heading__badge--number"></div>
+          </div>
+          <div class="toolbar glass-card reveal">
+            <label class="compact-field compact-field--grow"><span>シート</span><select id="rawSheetSelect"></select></label>
+            <label class="search-field"><span>⌕</span><input id="rawSearch" type="search" placeholder="行内を検索"></label>
+          </div>
+          <div class="table-panel glass-card reveal">
+            <div id="rawTableWrap" class="data-table-wrap data-table-wrap--raw"></div>
+            <div id="rawPagination" class="pagination"></div>
+          </div>
+        </section>
+
+        <section id="view-about" class="view" data-view-panel="about">
+          <div class="page-heading reveal">
+            <div>
+              <p class="eyebrow">MAINTENANCE</p>
+              <h2>Excel更新と公開方法</h2>
+              <p class="page-heading__description">同じ形のExcelなら、暗号化データを差し替えるだけで表示が更新される。</p>
+            </div>
+          </div>
+
+          <div class="guide-grid reveal">
+            <article class="guide-card glass-card"><span>01</span><h3>Excelを更新</h3><p>集計用の.xlsxをいつも通り更新して保存。シート名と列構成は維持する。</p></article>
+            <article class="guide-card glass-card"><span>02</span><h3>暗号化する</h3><p><code>tools/update-data.html</code>を開き、Excelと共通パスワードから新しい<code>data.enc</code>を作る。</p></article>
+            <article class="guide-card glass-card"><span>03</span><h3>差し替えて公開</h3><p>GitHub上の<code>data.enc</code>だけを置き換えてpush。GitHub Pagesへ自動反映される。</p></article>
+          </div>
+
+          <div class="dashboard-grid dashboard-grid--two reveal">
+            <article class="panel glass-card">
+              <div class="panel__heading"><div><p class="eyebrow">SECURITY</p><h3>この方式で守れる範囲</h3></div></div>
+              <div class="prose">
+                <p>Excelの中身はAES-GCMで暗号化され、パスワード自体はサイト内に保存しない。リポジトリには生のExcelを置かない。</p>
+                <p>ただし、共通パスワードを知る人はデータを閲覧・復号できる。パスワードが漏れた場合は、新しいパスワードで<code>data.enc</code>を作り直す。</p>
+              </div>
+            </article>
+            <article class="panel glass-card">
+              <div class="panel__heading"><div><p class="eyebrow">LOCAL PREVIEW</p><h3>公開前の確認</h3></div></div>
+              <div class="prose">
+                <p>このページ上部の「Excel」から、更新した.xlsxを一時的に読み込んで表示確認できる。ファイルはアップロードされず、このブラウザ内だけで処理される。</p>
+                <p>GitHub Pagesと同じ状態を確認する場合は、フォルダ内でローカルHTTPサーバーを起動する。</p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <nav class="mobile-nav" aria-label="モバイルナビゲーション">
+      <button class="is-active" type="button" data-view="overview"><span>◫</span>概要</button>
+      <button type="button" data-view="decks"><span>▱</span>デッキ</button>
+      <button type="button" data-view="cards"><span>◇</span>カード</button>
+      <button type="button" data-view="logs"><span>≡</span>ログ</button>
+      <button type="button" data-view="about"><span>•••</span>その他</button>
+    </nav>
+  </div>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal__backdrop" data-close-modal></div>
+    <div class="modal__panel glass-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal__close icon-button" type="button" data-close-modal aria-label="閉じる">×</button>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
