@@ -3,324 +3,201 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#08110f">
-  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#f4f5fb">
+  <meta name="color-scheme" content="light">
   <meta name="description" content="Xross Stars 対戦統計ダッシュボード">
-  <title>Xross Stats Dashboard</title>
+  <title>Xross Stats</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="ambient" aria-hidden="true">
-    <span class="ambient__orb ambient__orb--one"></span>
-    <span class="ambient__orb ambient__orb--two"></span>
-    <span class="ambient__grid"></span>
+  <div class="backdrop" aria-hidden="true">
+    <div class="backdrop__mesh"></div>
+    <div class="backdrop__flare backdrop__flare--a"></div>
+    <div class="backdrop__flare backdrop__flare--b"></div>
+    <div class="backdrop__slashes"></div>
   </div>
 
-  <section id="authScreen" class="auth-screen" aria-labelledby="authTitle">
-    <div class="auth-card glass-card">
-      <div class="auth-card__mark" aria-hidden="true">
-        <span></span><span></span><span></span>
+  <section id="authScreen" class="auth" aria-labelledby="authTitle">
+    <div class="auth__visual" aria-hidden="true">
+      <div class="x-mark x-mark--large"><i></i><i></i></div>
+      <span class="auth__orbit auth__orbit--one"></span>
+      <span class="auth__orbit auth__orbit--two"></span>
+      <span class="auth__scan"></span>
+    </div>
+    <div class="auth__panel">
+      <div class="brand-lockup">
+        <span class="x-mark"><i></i><i></i></span>
+        <span><strong>XROSS STATS</strong><small>COMPETITIVE DATA PORTAL</small></span>
       </div>
-      <p class="eyebrow">PRIVATE ANALYTICS</p>
-      <h1 id="authTitle">Xross Stats</h1>
-      <p class="auth-card__lead">共通パスワードで暗号化された統計データを開く。</p>
-
+      <p class="kicker">PRIVATE ACCESS</p>
+      <h1 id="authTitle">対戦データを<br>読み解く。</h1>
+      <p class="auth__lead">共通パスワードを入力して、暗号化された統計を開く。</p>
       <form id="authForm" class="auth-form" novalidate>
-        <label class="field-label" for="passwordInput">パスワード</label>
-        <div class="password-field">
-          <input id="passwordInput" name="password" type="password" autocomplete="current-password" placeholder="共通パスワードを入力" required>
-          <button id="togglePassword" class="icon-button" type="button" aria-label="パスワードを表示">表示</button>
+        <label for="passwordInput">パスワード</label>
+        <div class="password-control">
+          <input id="passwordInput" name="password" type="password" autocomplete="current-password" placeholder="共通パスワード" required>
+          <button id="togglePassword" type="button" aria-label="パスワードを表示">表示</button>
         </div>
-        <label class="check-row">
-          <input id="rememberSession" type="checkbox" checked>
-          <span>このタブを閉じるまで保持</span>
-        </label>
-        <button id="unlockButton" class="primary-button" type="submit">
-          <span class="primary-button__label">統計を開く</span>
-          <span class="primary-button__loader" aria-hidden="true"></span>
-        </button>
+        <label class="remember-control"><input id="rememberSession" type="checkbox" checked><span>このタブを閉じるまで保持</span></label>
+        <button id="unlockButton" class="button button--primary button--wide" type="submit"><span>統計を開く</span><i aria-hidden="true"></i></button>
       </form>
-
       <p id="authMessage" class="auth-message" role="status" aria-live="polite"></p>
-</label>
-      <p class="auth-card__note">データはブラウザ内で復号され、外部へ送信されない。</p>
+      <p class="auth__security">復号処理はこのブラウザ内だけで行われる。</p>
     </div>
   </section>
 
   <div id="app" class="app" hidden>
     <header class="topbar">
-      <button id="sidebarToggle" class="topbar__menu icon-button" type="button" aria-label="メニューを開く">☰</button>
-      <a class="brand" href="#overview" aria-label="概要へ移動">
-        <span class="brand__symbol"><i></i><i></i><i></i></span>
-        <span>
-          <strong>Xross Stats</strong>
-          <small>Competitive dashboard</small>
-        </span>
-      </a>
-      <div class="topbar__meta">
-        <span id="syncStatus" class="status-pill"><i></i>データ読込済み</span>
-        <span id="topLastUpdated" class="topbar__date"></span>
-<button id="lockButton" class="icon-button topbar__action" type="button" title="ロックする">Lock</button>
+      <button id="menuButton" class="icon-button topbar__menu" type="button" aria-label="メニューを開く">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <button class="brand-lockup brand-lockup--button" type="button" data-view="overview" aria-label="概要へ移動">
+        <span class="x-mark"><i></i><i></i></span>
+        <span><strong>XROSS STATS</strong><small>COMPETITIVE DATA PORTAL</small></span>
+      </button>
+      <div class="topbar__context">
+        <div><span>集計期間</span><strong id="topPeriod">—</strong></div>
+        <div><span>最終更新</span><strong id="topUpdated">—</strong></div>
+        <button id="lockButton" class="icon-button" type="button" aria-label="ロックする" title="ロックする">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z"/></svg>
+        </button>
       </div>
     </header>
 
-    <div class="app-shell">
-      <aside id="sidebar" class="sidebar">
-        <nav class="nav-list" aria-label="メインナビゲーション">
-          <button class="nav-item is-active" type="button" data-view="overview">
-            <span class="nav-item__icon">◫</span><span>概要</span>
-          </button>
-          <button class="nav-item" type="button" data-view="decks">
-            <span class="nav-item__icon">▱</span><span>デッキ</span>
-          </button>
-          <button class="nav-item" type="button" data-view="cards">
-            <span class="nav-item__icon">◇</span><span>カード統計</span>
-          </button>
-          <button class="nav-item" type="button" data-view="tactics">
-            <span class="nav-item__icon">↳</span><span>戦術構成</span>
-          </button>
-          <button class="nav-item" type="button" data-view="logs">
-            <span class="nav-item__icon">≡</span><span>対戦ログ</span>
-          </button>
-          <button class="nav-item" type="button" data-view="raw">
-            <span class="nav-item__icon">⌗</span><span>全データ</span>
-          </button>
-        </nav>
-        <div class="sidebar__footer">
-          <span>DATA SOURCE</span>
-          <strong id="sourceFileName">—</strong>
-          <small id="sidebarPeriod">—</small>
+    <aside id="sidebar" class="sidebar" aria-label="メインメニュー">
+      <div class="sidebar__head"><span>ANALYSIS</span><button id="closeMenuButton" class="icon-button" type="button" aria-label="メニューを閉じる">×</button></div>
+      <nav class="nav">
+        <button class="nav__item is-active" type="button" data-view="overview"><span class="nav__number">01</span><span><b>概要</b><small>Overview</small></span></button>
+        <button class="nav__item" type="button" data-view="decks"><span class="nav__number">02</span><span><b>デッキ</b><small>Deck analysis</small></span></button>
+        <button class="nav__item" type="button" data-view="cards"><span class="nav__number">03</span><span><b>カード統計</b><small>Card performance</small></span></button>
+        <button class="nav__item" type="button" data-view="tactics"><span class="nav__number">04</span><span><b>戦術構成</b><small>Tactics order</small></span></button>
+        <button class="nav__item" type="button" data-view="logs"><span class="nav__number">05</span><span><b>対戦ログ</b><small>Match records</small></span></button>
+      </nav>
+      <div class="sidebar__status"><i></i><span><b>DATA ONLINE</b><small id="sidebarGames">—</small></span></div>
+    </aside>
+    <button id="sidebarScrim" class="sidebar-scrim" type="button" aria-label="メニューを閉じる"></button>
+
+    <main id="mainContent" class="main">
+      <section class="view is-active" data-view-panel="overview">
+        <div class="hero motion-item">
+          <div class="hero__copy">
+            <p class="kicker">META OVERVIEW</p>
+            <h2>数字から、<br><em>勝ち筋</em>を見る。</h2>
+            <p id="overviewLead" class="hero__lead"></p>
+          </div>
+          <div class="hero__signal" aria-hidden="true">
+            <div class="signal-ring"><span id="heroWinRate">—</span><small>FIRST WIN RATE</small></div>
+            <div class="signal-lines"><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
         </div>
-      </aside>
 
-      <main id="mainContent" class="main-content">
-        <section id="view-overview" class="view is-active" data-view-panel="overview">
-          <div class="page-heading reveal">
-            <div>
-              <p class="eyebrow">OVERVIEW</p>
-              <h2>対戦環境を、ひと目で。</h2>
-              <p id="overviewDescription" class="page-heading__description"></p>
-            </div>
-            <div class="page-heading__badge">
-              <span>集計期間</span>
-              <strong id="overviewPeriod">—</strong>
-            </div>
-          </div>
+        <div id="kpiGrid" class="kpi-grid motion-group"></div>
+        <div id="insightStrip" class="insight-strip motion-item"></div>
 
-          <div id="kpiGrid" class="kpi-grid reveal"></div>
-
-          <div class="dashboard-grid dashboard-grid--two reveal">
-            <article class="panel glass-card">
-              <div class="panel__heading">
-                <div><p class="eyebrow">TURN ORDER</p><h3>先攻 / 後攻</h3></div>
-                <span class="panel__hint">勝率比較</span>
-              </div>
-              <div id="firstSecondChart" class="rate-comparison"></div>
-            </article>
-
-            <article class="panel glass-card">
-              <div class="panel__heading">
-                <div><p class="eyebrow">ROUND FLOW</p><h3>進行別の勝率</h3></div>
-                <span class="panel__hint">1R基準</span>
-              </div>
-              <div id="leadChart" class="lead-chart"></div>
-            </article>
-          </div>
-
-          <div class="dashboard-grid dashboard-grid--wide reveal">
-            <article class="panel glass-card">
-              <div class="panel__heading">
-                <div><p class="eyebrow">TOP DECKS</p><h3>信頼下限ランキング</h3></div>
-                <button class="text-button" type="button" data-jump-view="decks">すべて見る →</button>
-              </div>
-              <div id="overviewDecks" class="compact-ranking"></div>
-            </article>
-
-            <article class="panel glass-card">
-              <div class="panel__heading">
-                <div><p class="eyebrow">PICK TRENDS</p><h3>採用の中心</h3></div>
-                <button class="text-button" type="button" data-jump-view="cards">詳しく見る →</button>
-              </div>
-              <div id="overviewPicks" class="pick-columns"></div>
-            </article>
-          </div>
-
-          <article class="panel glass-card reveal">
-            <div class="panel__heading">
-              <div><p class="eyebrow">NOTES</p><h3>集計条件・定義</h3></div>
-            </div>
-            <div id="summaryNotes" class="notes-grid"></div>
+        <div class="layout-two motion-group">
+          <article class="panel panel--tall">
+            <div class="panel__head"><div><p class="kicker">TURN ORDER</p><h3>先攻 / 後攻</h3></div><span class="panel__meta">WIN RATE</span></div>
+            <div id="turnOrderChart" class="turn-chart"></div>
           </article>
-        </section>
+          <article class="panel panel--tall">
+            <div class="panel__head"><div><p class="kicker">ROUND FLOW</p><h3>進行別の勝率</h3></div><span class="panel__meta">ROUND 1</span></div>
+            <div id="leadFlowChart" class="flow-chart"></div>
+          </article>
+        </div>
 
-        <section id="view-decks" class="view" data-view-panel="decks">
-          <div class="page-heading reveal">
-            <div>
-              <p class="eyebrow">DECK ANALYSIS</p>
-              <h2>デッキランキング</h2>
-              <p class="page-heading__description">総合・勝ち進行・負け進行を切り替えて、構成や近いデッキを比較。</p>
-            </div>
-            <div id="deckResultCount" class="page-heading__badge page-heading__badge--number"></div>
-          </div>
+        <article class="panel motion-item">
+          <div class="panel__head"><div><p class="kicker">TOP DECKS</p><h3>信頼下限ランキング</h3></div><button class="text-link" type="button" data-jump="decks">一覧を見る</button></div>
+          <div id="overviewDecks" class="top-decks"></div>
+        </article>
 
-          <div class="toolbar glass-card reveal">
-            <div class="segmented" id="deckSheetTabs">
-              <button class="is-active" type="button" data-deck-sheet="all">総合</button>
-              <button type="button" data-deck-sheet="win">勝ち進行</button>
-              <button type="button" data-deck-sheet="lose">負け進行</button>
-            </div>
-            <label class="search-field">
-              <span>⌕</span>
-              <input id="deckSearch" type="search" placeholder="リーダー・ACEで検索">
-            </label>
-            <label class="compact-field">
-              <span>最低試合数</span>
-              <input id="deckMinGames" type="number" min="0" step="1" value="5">
-            </label>
-            <label class="compact-field">
-              <span>並び順</span>
-              <select id="deckSort">
-                <option value="confidence">信頼下限</option>
-                <option value="winrate">勝率</option>
-                <option value="games">試合数</option>
-                <option value="wins">勝数</option>
-              </select>
-            </label>
-          </div>
+        <div class="layout-three motion-group">
+          <article class="panel pick-panel"><div class="panel__head"><div><p class="kicker">LEADER</p><h3>採用トップ</h3></div></div><div id="leaderSpotlight"></div></article>
+          <article class="panel pick-panel"><div class="panel__head"><div><p class="kicker">ACE</p><h3>採用トップ</h3></div></div><div id="aceSpotlight"></div></article>
+          <article class="panel pick-panel"><div class="panel__head"><div><p class="kicker">TACTICS</p><h3>使用トップ</h3></div></div><div id="tacticsSpotlight"></div></article>
+        </div>
 
-          <div id="compareBar" class="compare-bar glass-card" hidden>
-            <div><strong id="compareCount">0</strong><span>件を比較中</span></div>
-            <div id="compareChips" class="compare-chips"></div>
-            <button id="clearCompare" class="secondary-button" type="button">選択解除</button>
-          </div>
+        <article class="panel notes-panel motion-item">
+          <div class="panel__head"><div><p class="kicker">DEFINITION</p><h3>集計条件</h3></div></div>
+          <div id="summaryNotes" class="notes-grid"></div>
+        </article>
+      </section>
 
-          <div id="deckList" class="deck-list reveal"></div>
-          <div class="center-action"><button id="loadMoreDecks" class="secondary-button" type="button">さらに表示</button></div>
-        </section>
+      <section class="view" data-view-panel="decks">
+        <div class="page-head motion-item"><div><p class="kicker">DECK ANALYSIS</p><h2>デッキを比較する。</h2><p>構成、勝率、信頼下限をまとめて確認。</p></div><div id="deckCountBadge" class="count-badge"><span>RESULT</span><strong>—</strong></div></div>
+        <div class="control-bar motion-item">
+          <div id="deckModeTabs" class="tabs"><button class="is-active" type="button" data-deck-mode="all">総合</button><button type="button" data-deck-mode="win">勝ち進行</button><button type="button" data-deck-mode="lose">負け進行</button></div>
+          <label class="search-control"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="deckSearch" type="search" placeholder="リーダー・ACEで検索"></label>
+          <label class="select-control"><span>最低試合数</span><input id="deckMinGames" type="number" min="0" step="1"></label>
+          <label class="select-control"><span>並び順</span><select id="deckSort"><option value="confidence">信頼下限</option><option value="winrate">勝率</option><option value="games">試合数</option><option value="wins">勝数</option></select></label>
+        </div>
+        <div id="compareTray" class="compare-tray" hidden><div><span>比較中</span><strong><b id="compareCount">0</b> / 4</strong></div><div id="compareNames" class="compare-tray__names"></div><button id="openComparison" class="button button--dark" type="button" disabled>比較を開く</button><button id="clearComparison" class="button button--ghost" type="button">解除</button></div>
+        <div id="deckList" class="deck-list motion-group"></div>
+        <div class="load-more"><button id="loadMoreDecks" class="button button--ghost" type="button">さらに表示</button></div>
+      </section>
 
-        <section id="view-cards" class="view" data-view-panel="cards">
-          <div class="page-heading reveal">
-            <div>
-              <p class="eyebrow">CARD STATS</p>
-              <h2>単体採用率・勝率</h2>
-              <p class="page-heading__description">リーダー、ACE、タクティクスを同じ尺度で確認。</p>
-            </div>
-            <div id="cardResultCount" class="page-heading__badge page-heading__badge--number"></div>
-          </div>
+      <section class="view" data-view-panel="cards">
+        <div class="page-head motion-item"><div><p class="kicker">CARD PERFORMANCE</p><h2>カードの傾向を見る。</h2><p>採用率と勝率を、カード画像と一緒に比較。</p></div><div id="cardCountBadge" class="count-badge"><span>RESULT</span><strong>—</strong></div></div>
+        <div class="control-bar motion-item">
+          <div id="cardTypeTabs" class="tabs"></div>
+          <label class="search-control"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="cardSearch" type="search" placeholder="カード名で検索"></label>
+          <label class="select-control"><span>並び順</span><select id="cardSort"><option value="adoption">採用・使用率</option><option value="winrate">勝率</option><option value="games">試合数</option><option value="count">採用・使用数</option></select></label>
+        </div>
+        <div id="cardStatsList" class="card-stats-grid motion-group"></div>
+      </section>
 
-          <div class="toolbar glass-card reveal">
-            <div class="segmented" id="cardTypeTabs">
-              <button class="is-active" type="button" data-card-type="leader">リーダー</button>
-              <button type="button" data-card-type="ace">ACE</button>
-              <button type="button" data-card-type="tactic">タクティクス</button>
-            </div>
-            <label class="search-field">
-              <span>⌕</span>
-              <input id="cardSearch" type="search" placeholder="名前で検索">
-            </label>
-            <label class="compact-field">
-              <span>並び順</span>
-              <select id="cardSort">
-                <option value="adoption">採用率 / 使用率</option>
-                <option value="winrate">勝率</option>
-                <option value="games">試合数</option>
-                <option value="count">採用数 / 使用数</option>
-              </select>
-            </label>
-          </div>
-          <div id="cardStatsList" class="stat-list reveal"></div>
-        </section>
+      <section class="view" data-view-panel="tactics">
+        <div class="page-head motion-item"><div><p class="kicker">TACTICS ORDER</p><h2>戦術の選ばれ方を見る。</h2><p>デッキごとのタクティクス順と結果を確認。</p></div><div id="tacticDeckCount" class="count-badge"><span>DECKS</span><strong>—</strong></div></div>
+        <div class="control-bar motion-item">
+          <label class="search-control search-control--wide"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="tacticDeckSearch" list="tacticDeckOptions" placeholder="リーダー・ACEからデッキを検索"><datalist id="tacticDeckOptions"></datalist></label>
+          <button id="popularTacticDeck" class="button button--ghost" type="button">最多使用デッキ</button>
+        </div>
+        <article id="selectedTacticDeck" class="selected-deck motion-item"></article>
+        <div id="tacticSequenceList" class="sequence-list motion-group"></div>
+      </section>
 
-        <section id="view-tactics" class="view" data-view-panel="tactics">
-          <div class="page-heading reveal">
-            <div>
-              <p class="eyebrow">TACTICS ORDER</p>
-              <h2>デッキ別タクティクス</h2>
-              <p class="page-heading__description">Excel上で崩れていた選択表を、元データから検索できる形に再構成。</p>
-            </div>
-            <div id="tacticDeckCount" class="page-heading__badge page-heading__badge--number"></div>
-          </div>
+      <section class="view" data-view-panel="logs">
+        <div class="page-head motion-item"><div><p class="kicker">MATCH RECORDS</p><h2>対戦を振り返る。</h2><p>大会、ユーザー、構成、メモをまとめて検索。</p></div><div id="logCountBadge" class="count-badge"><span>RESULT</span><strong>—</strong></div></div>
+        <div class="control-bar motion-item">
+          <label class="search-control search-control--wide"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="logSearch" type="search" placeholder="大会・ユーザー・カード・メモを検索"></label>
+          <label class="select-control"><span>先後</span><select id="logTurn"><option value="">すべて</option><option>先攻</option><option>後攻</option></select></label>
+          <label class="select-control"><span>結果</span><select id="logResult"><option value="">すべて</option><option value="勝">勝ち</option><option value="負">負け</option></select></label>
+          <label class="select-control"><span>進行</span><select id="logLead"><option value="">すべて</option><option>勝ち進行</option><option>負け進行</option></select></label>
+        </div>
+        <div id="logList" class="log-list motion-group"></div>
+        <div id="logPagination" class="pagination"></div>
+      </section>
+    </main>
 
-          <div class="toolbar glass-card reveal toolbar--stack-mobile">
-            <label class="search-field search-field--wide">
-              <span>⌕</span>
-              <input id="tacticDeckSearch" type="search" list="tacticDeckOptions" placeholder="デッキのリーダー・ACEを入力">
-              <datalist id="tacticDeckOptions"></datalist>
-            </label>
-            <button id="showPopularTacticDeck" class="secondary-button" type="button">使用数最多を表示</button>
-          </div>
-
-          <article id="tacticDeckSummary" class="selected-deck glass-card reveal"></article>
-          <div id="tacticSequenceList" class="sequence-list reveal"></div>
-        </section>
-
-        <section id="view-logs" class="view" data-view-panel="logs">
-          <div class="page-heading reveal">
-            <div>
-              <p class="eyebrow">MATCH LOGS</p>
-              <h2>対戦ログ</h2>
-              <p class="page-heading__description">大会・ユーザー・構成・メモを横断検索。全25列を確認できる。</p>
-            </div>
-            <div id="logResultCount" class="page-heading__badge page-heading__badge--number"></div>
-          </div>
-
-          <div class="toolbar glass-card reveal toolbar--logs">
-            <label class="search-field search-field--wide">
-              <span>⌕</span>
-              <input id="logSearch" type="search" placeholder="大会名・ユーザー・カード・メモを検索">
-            </label>
-            <label class="compact-field"><span>先後</span><select id="logTurnFilter"><option value="">すべて</option><option>先攻</option><option>後攻</option></select></label>
-            <label class="compact-field"><span>結果</span><select id="logResultFilter"><option value="">すべて</option><option>勝</option><option>負</option></select></label>
-            <label class="compact-field"><span>進行</span><select id="logLeadFilter"><option value="">すべて</option><option>勝ち進行</option><option>負け進行</option></select></label>
-          </div>
-
-          <div class="table-panel glass-card reveal">
-            <div id="logTableWrap" class="data-table-wrap"></div>
-            <div id="logMobileCards" class="log-mobile-cards"></div>
-            <div id="logPagination" class="pagination"></div>
-          </div>
-        </section>
-
-        <section id="view-raw" class="view" data-view-panel="raw">
-          <div class="page-heading reveal">
-            <div>
-              <p class="eyebrow">ALL SHEETS</p>
-              <h2>全データ</h2>
-              <p class="page-heading__description">暗号化データに含まれる全シートを、行・列を省略せず確認。</p>
-            </div>
-            <div id="rawSheetSize" class="page-heading__badge page-heading__badge--number"></div>
-          </div>
-          <div class="toolbar glass-card reveal">
-            <label class="compact-field compact-field--grow"><span>シート</span><select id="rawSheetSelect"></select></label>
-            <label class="search-field"><span>⌕</span><input id="rawSearch" type="search" placeholder="行内を検索"></label>
-          </div>
-          <div class="table-panel glass-card reveal">
-            <div id="rawTableWrap" class="data-table-wrap data-table-wrap--raw"></div>
-            <div id="rawPagination" class="pagination"></div>
-          </div>
-        </section>
-      </main>
-    </div>
-
-    <nav class="mobile-nav" aria-label="モバイルナビゲーション">
-      <button class="is-active" type="button" data-view="overview"><span>◫</span>概要</button>
-      <button type="button" data-view="decks"><span>▱</span>デッキ</button>
-      <button type="button" data-view="cards"><span>◇</span>カード</button>
-      <button type="button" data-view="logs"><span>≡</span>ログ</button>
+    <nav class="mobile-nav" aria-label="モバイルメニュー">
+      <button class="is-active" type="button" data-view="overview"><span>01</span><b>概要</b></button>
+      <button type="button" data-view="decks"><span>02</span><b>デッキ</b></button>
+      <button type="button" data-view="cards"><span>03</span><b>カード</b></button>
+      <button type="button" data-view="tactics"><span>04</span><b>戦術</b></button>
+      <button type="button" data-view="logs"><span>05</span><b>ログ</b></button>
     </nav>
   </div>
 
-  <div id="modal" class="modal" hidden>
-    <div class="modal__backdrop" data-close-modal></div>
-    <div class="modal__panel glass-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <button class="modal__close icon-button" type="button" data-close-modal aria-label="閉じる">×</button>
-      <div id="modalContent"></div>
+  <div id="routeTransition" class="route-transition" aria-hidden="true">
+    <div class="route-transition__curtain route-transition__curtain--back"></div>
+    <div class="route-transition__curtain route-transition__curtain--mid"></div>
+    <div class="route-transition__curtain route-transition__curtain--front"></div>
+    <div class="route-transition__grid"></div>
+    <div class="route-transition__scan"></div>
+    <div class="route-transition__cross"><i></i><i></i></div>
+    <div class="route-transition__copy">
+      <span id="routeTransitionIndex">01</span>
+      <div><small>ANALYSIS MODULE</small><strong id="routeTransitionTitle">OVERVIEW</strong><b id="routeTransitionLabel">概要</b></div>
     </div>
+    <div class="route-transition__progress"><i></i></div>
   </div>
 
+  <dialog id="modal" class="modal">
+    <button class="modal__scrim" type="button" data-close-modal aria-label="閉じる"></button>
+    <div class="modal__sheet"><button class="modal__close" type="button" data-close-modal aria-label="閉じる">×</button><div id="modalContent"></div></div>
+  </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script src="card-map.js" defer></script>
-  <script src="app.js" defer></script>
+  <script src="card-map.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
