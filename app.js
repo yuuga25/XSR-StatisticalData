@@ -14,10 +14,10 @@
   const elements = {
     authScreen: $('#authScreen'), authForm: $('#authForm'), passwordInput: $('#passwordInput'),
     rememberSession: $('#rememberSession'), unlockButton: $('#unlockButton'), togglePassword: $('#togglePassword'),
-    authMessage: $('#authMessage'), app: $('#app'), sidebar: $('#sidebar'), menuButton: $('#menuButton'),
-    closeMenuButton: $('#closeMenuButton'), sidebarScrim: $('#sidebarScrim'), lockButton: $('#lockButton'),
-    modal: $('#modal'), modalContent: $('#modalContent'), toast: $('#toast'), mainContent: $('#mainContent'),
-    routeTransition: $('#routeTransition'), routeTransitionIndex: $('#routeTransitionIndex'),
+    authMessage: $('#authMessage'), app: $('#app'), loadingScreen: $('#loadingScreen'), sidebar: $('#sidebar'),
+    menuButton: $('#menuButton'), closeMenuButton: $('#closeMenuButton'), sidebarScrim: $('#sidebarScrim'),
+    lockButton: $('#lockButton'), modal: $('#modal'), modalContent: $('#modalContent'), toast: $('#toast'),
+    mainContent: $('#mainContent'), routeTransition: $('#routeTransition'), routeTransitionIndex: $('#routeTransitionIndex'),
     routeTransitionTitle: $('#routeTransitionTitle'), routeTransitionLabel: $('#routeTransitionLabel')
   };
 
@@ -42,6 +42,8 @@
   async function init() {
     bindEvents();
     await fetchEncryptedData();
+    elements.loadingScreen?.remove();
+    document.body.classList.remove('is-loading');
     const savedPassword = sessionStorage.getItem(SESSION_KEY);
     if (savedPassword && state.encryptedBuffer) {
       elements.passwordInput.value = savedPassword;
@@ -140,13 +142,13 @@
       setAuthMessage('');
     } catch (error) {
       console.error(error);
-      setAuthMessage('統計データを読み込めなかった。公開ファイルを確認して。');
+      setAuthMessage('統計データを読み込めなかった。');
     }
   }
 
   async function attemptUnlock(password, automatic) {
     if (!state.encryptedBuffer) return setAuthMessage('統計データがまだ読み込めていない。');
-    setLoading(true);
+    setUnlockLoading(true);
     setAuthMessage(automatic ? '保存されたセッションを確認中…' : '統計データを復号している…', true);
     try {
       const data = await decryptPayload(state.encryptedBuffer, password);
@@ -164,7 +166,7 @@
       setAuthMessage('パスワードが違うか、統計データが壊れている。');
       if (!automatic) elements.passwordInput.select();
     } finally {
-      setLoading(false);
+      setUnlockLoading(false);
     }
   }
 
@@ -299,7 +301,7 @@
     const second = firstSecond.find(row => row['先後'] === '後攻') || {};
     const firstRate = number(first['勝率']);
     const delta = firstRate - number(second['勝率']);
-    $('#overviewLead').textContent = `${formatInt(meta.games)}試合、${formatInt(meta.users)}人、${formatInt(meta.decks)}種のデッキから現在の対戦環境を整理。`;
+    $('#overviewLead').textContent = `${meta.period}  /  ${formatInt(meta.games)} MATCHES  /  ${formatInt(meta.users)} PLAYERS`;
     $('#heroWinRate').textContent = percent(firstRate, 1);
     const kpis = [
       { label: '対象試合', value: meta.games, unit: '試合', sub: `${formatInt(meta.logs)}件の提出ログ`, color: 'var(--cyan)' },
@@ -313,7 +315,7 @@
         <strong class="kpi-card__value" data-counter="${item.value}">0<small>${escapeHtml(item.unit)}</small></strong>
         <span class="kpi-card__sub">${escapeHtml(item.sub)}</span>
       </article>`).join('');
-    $('#insightStrip').innerHTML = `<span class="insight-strip__icon">X</span><p><strong>先攻が後攻を${Math.abs(delta * 100).toFixed(1)}ポイント${delta >= 0 ? '上回る' : '下回る'}。</strong> 進行別データとあわせて、初動の影響を確認できる。</p><span class="insight-strip__tag">KEY SIGNAL</span>`;
+    $('#insightStrip').innerHTML = `<div><span>FIRST / SECOND GAP</span><strong>${delta >= 0 ? '+' : ''}${(delta * 100).toFixed(1)}<small>pt</small></strong></div><p><b>先攻 ${percent(firstRate, 1)}</b><i></i><b>後攻 ${percent(second['勝率'], 1)}</b></p>`;
     $('#turnOrderChart').innerHTML = firstSecond.map((row, index) => `
       <div class="turn-row">
         <div class="turn-row__label"><strong>${escapeHtml(row['先後'])}</strong><small>${formatInt(row['試合数'])}試合</small></div>
@@ -379,8 +381,8 @@
       return `<article class="deck-card ${selected ? 'is-selected' : ''}">
         <div class="deck-rank">#${deck.rank}</div>
         <div class="deck-lineup">
-          <div class="deck-lineup__leaders">${deck.leaders.map(name => cardChipHTML(name, 'leader')).join('')}</div>
-          <div class="deck-lineup__aces">${deck.aces.map(name => cardChipHTML(name, 'ace', true)).join('')}</div>
+          <div class="deck-lineup__leaders" data-card-count="${deck.leaders.length}">${deck.leaders.map(name => lineupCardHTML(name, 'leader')).join('')}</div>
+          <div class="deck-lineup__aces"><span class="deck-lineup__label">ACE</span>${deck.aces.map(name => cardChipHTML(name, 'ace', true)).join('')}</div>
         </div>
         <div class="deck-metrics">
           <div class="deck-metric"><span>試合</span><strong>${formatInt(deck.games)}</strong></div>
@@ -546,7 +548,7 @@
     state.logPage = Math.min(state.logPage, totalPages);
     const pageRows = filtered.slice((state.logPage - 1) * LOG_PAGE_SIZE, state.logPage * LOG_PAGE_SIZE);
     $('#logCountBadge strong').textContent = formatInt(filtered.length);
-    $('#logList').innerHTML = pageRows.length ? pageRows.map((log, i) => logCardHTML(log, i === 0 && state.logPage === 1)).join('') : '<div class="empty-state"><strong>該当する対戦ログがない</strong>検索条件を変更して。</div>';
+    $('#logList').innerHTML = pageRows.length ? pageRows.map(log => logCardHTML(log, false)).join('') : '<div class="empty-state"><strong>該当する対戦ログがない</strong>検索条件を変更して。</div>';
     renderPagination($('#logPagination'), state.logPage, totalPages, page => { state.logPage = page; renderLogs(); scrollViewTop(); });
     hydrateCardImages($('#logList'));
     animateVisuals($('[data-view-panel="logs"]'));
@@ -558,20 +560,70 @@
     const selfTactics = [1,2,3].map(i => log[`自分戦術${i}`]).filter(Boolean);
     const opponentTactics = [1,2,3].map(i => log[`相手戦術${i}`]).filter(Boolean);
     const win = log['結果'] === '勝';
-    return `<details class="log-card" ${open ? 'open' : ''}>
+    const resultText = win ? 'WIN' : 'LOSE';
+    const matchNumber = log['対戦番号'] || '—';
+
+    return `<details class="log-card ${win ? 'is-win' : 'is-lose'}" ${open ? 'open' : ''}>
       <summary class="log-card__summary">
-        <div class="log-card__event"><time>${escapeHtml(formatExcelDate(log['大会日付']))}</time><h3>${escapeHtml(log['大会名'] || '大会名なし')}</h3><p>${escapeHtml(log['ユーザー名'] || '—')} / 第${escapeHtml(log['対戦番号'] || '—')}戦</p></div>
-        <div class="log-card__lineup">${selfLeaders.map(name => cardArtHTML(name, 'leader', 'sm')).join('')}${selfAces.map(name => cardArtHTML(name, 'ace', 'sm')).join('')}</div>
-        <div class="log-card__result"><span class="result-badge ${win ? 'result-badge--win' : 'result-badge--lose'}">${win ? 'WIN' : 'LOSE'}</span><div><span>${escapeHtml(log['先後'] || '—')}</span><strong>${escapeHtml(log['進行'] || '—')}</strong></div></div>
+        <div class="log-card__event">
+          <div class="log-card__event-meta"><time>${escapeHtml(formatExcelDate(log['大会日付']))}</time><span>ROUND ${escapeHtml(matchNumber)}</span></div>
+          <h3>${escapeHtml(log['大会名'] || '大会名なし')}</h3>
+          <p>${escapeHtml(log['ユーザー名'] || '—')}</p>
+        </div>
+
+        <div class="log-matchup" aria-label="対戦構成">
+          <div class="log-team log-team--self">
+            <span class="log-team__label">YOUR LEADERS</span>
+            <div class="log-team__leaders" data-card-count="${selfLeaders.length}">${selfLeaders.map(name => lineupCardHTML(name, 'leader', true)).join('')}</div>
+            <div class="log-team__aces">${selfAces.length ? `<span>ACE</span>${selfAces.map(name => cardChipHTML(name, 'ace', true)).join('')}` : '<span>ACE —</span>'}</div>
+          </div>
+          <span class="log-matchup__vs">VS</span>
+          <div class="log-team log-team--opponent">
+            <span class="log-team__label">OPPONENT LEADERS</span>
+            <div class="log-team__leaders" data-card-count="${opponentLeaders.length}">${opponentLeaders.map(name => lineupCardHTML(name, 'leader', true)).join('')}</div>
+          </div>
+        </div>
+
+        <div class="log-card__result">
+          <span class="result-badge ${win ? 'result-badge--win' : 'result-badge--lose'}">${resultText}</span>
+          <div class="log-result-meta"><span>${escapeHtml(log['先後'] || '—')}</span><strong>${escapeHtml(log['進行'] || '—')}</strong></div>
+          <span class="log-card__toggle"><b>詳細</b><i aria-hidden="true">⌄</i></span>
+        </div>
       </summary>
-      <div class="log-card__details"><div class="log-versus">
-        <div class="log-side"><div class="log-side__label"><span>YOUR TEAM</span><span>${escapeHtml(log['先後'] || '')}</span></div><div class="log-side__cards">${selfLeaders.map(name => cardChipHTML(name, 'leader')).join('')}${selfAces.map(name => cardChipHTML(name, 'ace', true)).join('')}</div><div class="log-side__tactics"><b>TACTICS</b><br>${selfTactics.length ? escapeHtml(selfTactics.join(' → ')) : '—'}</div></div>
-        <div class="log-vs">VS</div>
-        <div class="log-side"><div class="log-side__label"><span>OPPONENT</span><span></span></div><div class="log-side__cards">${opponentLeaders.map(name => cardChipHTML(name, 'leader')).join('')}</div><div class="log-side__tactics"><b>TACTICS</b><br>${opponentTactics.length ? escapeHtml(opponentTactics.join(' → ')) : '—'}</div></div>
-      </div>${log['メモ'] ? `<p class="log-note">${escapeHtml(log['メモ'])}</p>` : ''}</div>
+
+      <div class="log-card__details">
+        <div class="log-detail-meta">
+          <span><b>大会</b>${escapeHtml(log['大会名'] || '—')}</span>
+          <span><b>ユーザー</b>${escapeHtml(log['ユーザー名'] || '—')}</span>
+          <span><b>先後</b>${escapeHtml(log['先後'] || '—')}</span>
+          <span><b>進行</b>${escapeHtml(log['進行'] || '—')}</span>
+        </div>
+        <div class="log-versus">
+          <section class="log-side log-side--self">
+            <div class="log-side__label"><span>自分の構成</span><strong>${resultText}</strong></div>
+            <div class="log-side__cards">${selfLeaders.map(name => cardChipHTML(name, 'leader')).join('')}${selfAces.map(name => cardChipHTML(name, 'ace', true)).join('')}</div>
+            ${tacticsRouteHTML(selfTactics, '自分のタクティクス')}
+          </section>
+          <div class="log-vs">VS</div>
+          <section class="log-side log-side--opponent">
+            <div class="log-side__label"><span>相手の構成</span><strong>OPPONENT</strong></div>
+            <div class="log-side__cards">${opponentLeaders.map(name => cardChipHTML(name, 'leader')).join('')}</div>
+            ${tacticsRouteHTML(opponentTactics, '相手のタクティクス')}
+          </section>
+        </div>
+        ${log['メモ'] ? `<div class="log-note"><b>MEMO</b><p>${escapeHtml(log['メモ'])}</p></div>` : ''}
+      </div>
     </details>`;
   }
 
+  function tacticsRouteHTML(tactics, label) {
+    if (!tactics.length) return `<div class="log-side__tactics"><b>${escapeHtml(label)}</b><span class="log-tactic-empty">記録なし</span></div>`;
+    return `<div class="log-side__tactics"><b>${escapeHtml(label)}</b><div class="log-tactic-route">${tactics.map((name, index) => `<span class="log-tactic"><i>${index + 1}</i>${escapeHtml(name)}</span>`).join('<span class="log-tactic-arrow">→</span>')}</div></div>`;
+  }
+
+  function lineupCardHTML(name, role, compact = false) {
+    return `<span class="lineup-card ${compact ? 'lineup-card--compact' : ''}">${cardArtHTML(name, role, 'sm')}<b>${escapeHtml(name)}</b></span>`;
+  }
   function cardChipHTML(name, role, ace = false) {
     return `<span class="card-chip ${ace ? 'card-chip--ace' : ''}">${cardArtHTML(name, role, 'xs')}<span>${escapeHtml(name)}</span></span>`;
   }
@@ -591,7 +643,24 @@
     const entry = cardEntry(name);
     const info = entry?.roles?.[role] || Object.values(entry?.roles || {})[0];
     if (!info?.ids?.length) return [];
-    return [...new Set(info.ids.map(id => `assets/cards/${encodeURIComponent(id)}.png`))];
+
+    // Leader images use the base Unity ID as the public filename.
+    // Example: LC6_0 in the master data resolves to assets/cards/LC6.png first.
+    const ids = [];
+    info.ids.forEach(rawId => {
+      const id = String(rawId || '').trim();
+      if (!id) return;
+      if (role === 'leader') {
+        const baseId = id.replace(/_0$/i, '');
+        ids.push(baseId);
+        if (baseId !== id) ids.push(id); // backward-compatible fallback
+      } else {
+        ids.push(id);
+      }
+    });
+
+    const extensions = ['png', 'webp', 'jpg', 'jpeg'];
+    return [...new Set(ids)].flatMap(id => extensions.map(ext => `assets/cards/${encodeURIComponent(id)}.${ext}`));
   }
   function resolveCardImage(name, role) {
     const key = `${role}:${name}`;
@@ -631,6 +700,35 @@
         image.src = source;
       });
     });
+  }
+
+  function lockApp() {
+    sessionStorage.removeItem(SESSION_KEY);
+    closeSidebar();
+    closeModal();
+    state.data = null;
+    state.prepared = null;
+    state.deckCompare.clear();
+    elements.app.hidden = true;
+    elements.authScreen.hidden = false;
+    document.body.classList.remove('is-unlocked');
+    elements.passwordInput.value = '';
+    elements.passwordInput.type = 'password';
+    elements.togglePassword.textContent = '表示';
+    setAuthMessage('');
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    requestAnimationFrame(() => elements.passwordInput.focus());
+  }
+
+  function setAuthMessage(message, info = false) {
+    elements.authMessage.textContent = message;
+    elements.authMessage.classList.toggle('is-info', info);
+  }
+
+  function setUnlockLoading(loading) {
+    elements.unlockButton.disabled = loading;
+    elements.unlockButton.classList.toggle('is-loading', loading);
+    elements.passwordInput.disabled = loading;
   }
 
   function switchView(view, updateHash = true) {
@@ -734,16 +832,6 @@
 
   function openSidebar() { elements.sidebar.classList.add('is-open'); }
   function closeSidebar() { elements.sidebar.classList.remove('is-open'); }
-  function lockApp() {
-    sessionStorage.removeItem(SESSION_KEY);
-    state.data = null; state.prepared = null;
-    elements.app.hidden = true;
-    elements.authScreen.hidden = false;
-    document.body.classList.remove('is-unlocked');
-    elements.passwordInput.value = '';
-    setAuthMessage('ロックした。', true);
-    elements.passwordInput.focus();
-  }
 
   function animateVisuals(root) {
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -802,14 +890,6 @@
     elements.toast.textContent = message;
     elements.toast.classList.add('is-visible');
     state.toastTimer = setTimeout(() => elements.toast.classList.remove('is-visible'), 3000);
-  }
-  function setAuthMessage(message, info = false) {
-    elements.authMessage.textContent = message;
-    elements.authMessage.classList.toggle('is-info', info);
-  }
-  function setLoading(loading) {
-    elements.unlockButton.disabled = loading;
-    elements.unlockButton.classList.toggle('is-loading', loading);
   }
   function scrollViewTop() { elements.mainContent.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
