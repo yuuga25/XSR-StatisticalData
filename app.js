@@ -25,6 +25,7 @@
     encryptedBuffer: null, data: null, prepared: null, activeView: 'overview',
     deckMode: 'all', deckLimit: 30, deckCompare: new Map(), cardType: 'leader',
     selectedTacticDeck: '', logPage: 1, toastTimer: null,
+    matchupMode: 'matchup', matchupLeader: '', synergyLimit: 24,
     isTransitioning: false, pendingView: null
   };
   const imageResolutionCache = new Map();
@@ -33,7 +34,8 @@
     { key: 'decks', index: '02', title: 'DECK ANALYSIS', label: 'デッキ' },
     { key: 'cards', index: '03', title: 'CARD PERFORMANCE', label: 'カード統計' },
     { key: 'tactics', index: '04', title: 'TACTICS ORDER', label: '戦術構成' },
-    { key: 'logs', index: '05', title: 'MATCH RECORDS', label: '対戦ログ' }
+    { key: 'matchup', index: '05', title: 'MATCHUP & SYNERGY', label: '対面・相性' },
+    { key: 'logs', index: '06', title: 'MATCH RECORDS', label: '対戦ログ' }
   ];
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -137,6 +139,27 @@
       selectTacticDeck(decodeURIComponent(button.dataset.tacticDeck), true);
     });
 
+    $('#matchupModeTabs').addEventListener('click', event => {
+      const button = event.target.closest('[data-matchup-mode]');
+      if (!button) return;
+      state.matchupMode = button.dataset.matchupMode;
+      state.synergyLimit = 24;
+      $$('#matchupModeTabs button').forEach(item => item.classList.toggle('is-active', item === button));
+      renderMatchup();
+    });
+    ['matchupSearch', 'matchupMinGames'].forEach(id => $(`#${id}`).addEventListener('input', () => {
+      state.synergyLimit = 24;
+      renderMatchup();
+    }));
+    $('#matchupSort').addEventListener('change', renderMatchup);
+    $('#matchupLeaderRail').addEventListener('click', event => {
+      const button = event.target.closest('[data-matchup-leader]');
+      if (!button) return;
+      state.matchupLeader = decodeURIComponent(button.dataset.matchupLeader);
+      renderMatchup();
+    });
+    $('#synergyMore').addEventListener('click', () => { state.synergyLimit += 24; renderSynergy(); });
+
     ['logSearch', 'logTurn', 'logResult', 'logLead'].forEach(id => {
       $(`#${id}`).addEventListener(id === 'logSearch' ? 'input' : 'change', () => { state.logPage = 1; renderLogs(); });
     });
@@ -230,7 +253,7 @@
     $('#sidebarGames').textContent = `${formatInt(state.prepared.meta.games)} matches`;
     renderAll();
     const hashView = location.hash.slice(1);
-    switchView(['overview', 'decks', 'cards', 'tactics', 'logs'].includes(hashView) ? hashView : 'overview', false);
+    switchView(ROUTES.some(route => route.key === hashView) ? hashView : 'overview', false);
   }
 
   function prepareData(data) {
@@ -242,22 +265,32 @@
       lose: recordsFromSheet(data, 'D3_DeckWinRate_LoseLead', 1).map((record, i) => normalizeDeck(record, 'lose', i))
     };
     const cardConfigs = [
-      { key: 'leader', label: 'リーダー', role: 'leader', sheet: 'G2_LeaderStats', nameKey: 'リーダー名', countKey: '採用数', rateKey: '採用率' },
-      { key: 'ace', label: 'ACE', role: 'ace', sheet: 'G3_AceStats', nameKey: 'ACE名', countKey: '採用数', rateKey: '採用率' },
-      { key: 'tactics', label: 'タクティクス', role: 'tactics', sheet: 'G4_TacticStats', nameKey: 'タクティクス名', countKey: '使用数', rateKey: '使用率' }
+      { key: 'leader', label: 'リーダー', role: 'leader', sheet: 'G2_LeaderStats', nameKey: 'リーダー名', countKey: '採用数', rateKey: '採用率', countLabel: '採用数', rateLabel: '採用率' },
+      { key: 'ace', label: 'ACE', role: 'ace', sheet: 'G3_AceStats', nameKey: 'ACE名', countKey: '採用数', rateKey: '採用率', countLabel: '採用数', rateLabel: '採用率' },
+      { key: 'tactics', label: 'タクティクス', role: 'tactics', sheet: 'G4_TacticStats', nameKey: 'タクティクス名', countKey: '使用数', rateKey: '使用率', countLabel: '使用数', rateLabel: '使用率' }
     ].filter(config => data.sheets?.[config.sheet]);
-    const cardGroups = cardConfigs.map(config => ({
-      ...config,
-      items: recordsFromSheet(data, config.sheet, 1).map((record, i) => normalizeCardStat(record, config, i))
-    }));
     const logs = recordsFromSheet(data, 'RawLogs', 1)
       .map((record, index) => sanitizeLogRecord(record, index))
       .sort((a, b) => number(b['大会日付']) - number(a['大会日付']) || number(b['更新日時']) - number(a['更新日時']) || number(b['対戦番号']) - number(a['対戦番号']));
+    // 相手側・ラウンド別・対面・相性はシートに存在しないため RawLogs から集計する。
+    // 1試合1行なので、相手側の母数は「試合数」。G2・G3の採用率は「ログ数」、
+    // G4の使用率は「延べ選択数」が母数で、単純には比べられない点に注意。
+    const cardGroups = [
+      ...cardConfigs.map(config => ({
+        ...config,
+        items: recordsFromSheet(data, config.sheet, 1).map((record, i) => normalizeCardStat(record, config, i))
+      })),
+      ...buildOpponentGroups(logs)
+    ];
     const tacticGroups = buildTacticGroups(data, logs);
     return {
       summary, decks, cardGroups,
       firstSecond: recordsFromSheet(data, 'G1_FirstSecond', 1),
       leadStats: recordsFromSheet(data, 'G5_LeadWinRate', 1),
+      roundStats: buildRoundStats(logs),
+      dailyTrend: buildDailyTrend(logs),
+      matchups: buildMatchups(logs),
+      synergy: buildSynergy(logs),
       tacticGroups, logs,
       meta: {
         period: String(summary.get('集計対象期間（大会日付）') || '—'),
@@ -291,11 +324,25 @@
     };
   }
   function normalizeCardStat(record, config, index) {
+    const games = number(record['試合数']);
+    const wins = number(record['勝数']);
     return {
       key: config.key, role: config.role, rank: index + 1, name: String(record[config.nameKey] || ''),
-      count: number(record[config.countKey]), adoptionRate: number(record[config.rateKey]), games: number(record['試合数']),
-      wins: number(record['勝数']), winRate: number(record['勝率']), raw: record
+      count: number(record[config.countKey]), adoptionRate: number(record[config.rateKey]), games, wins,
+      winRate: number(record['勝率']),
+      // シートに信頼下限の列はないので、試合数と勝数から同じ式で算出する。
+      confidence: record['信頼下限'] == null ? wilsonLower(wins, games) : number(record['信頼下限']),
+      raw: record
     };
+  }
+
+  // Wilson区間の下限（両側95%）。Summaryの「信頼下限」と同じ定義。
+  function wilsonLower(wins, games) {
+    const n = number(games);
+    if (n <= 0) return 0;
+    const z = 1.96;
+    const p = number(wins) / n;
+    return (p + z * z / (2 * n) - z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / (1 + z * z / n);
   }
 
   const RAW_LOG_HIDDEN_FIELDS = new Set(['ownerUid', 'ログID', 'ドキュメントID', 'ステータス']);
@@ -330,9 +377,9 @@
     if (!groups.size) {
       const counters = new Map();
       logs.forEach(log => {
-        const leaders = [1,2,3,4].map(i => String(log[`自分リーダー${i}`] || '').trim()).filter(Boolean);
-        const aces = Array.from({ length: 8 }, (_, i) => String(log[`自分ACE${i + 1}`] || '').trim()).filter(Boolean);
-        const tactics = [1,2,3].map(i => String(log[`自分戦術${i}`] || '').trim()).filter(Boolean);
+        const leaders = logLeaders(log, '自分');
+        const aces = logAces(log, '自分');
+        const tactics = logTactics(log, '自分');
         if (leaders.length !== 4 || !tactics.length) return;
         const deck = `${leaders.join(' / ')} ＋ ${aces.join(' / ')}`;
         const order = tactics.join(' → ');
@@ -349,12 +396,154 @@
     return groups;
   }
 
+  // ---- RawLogs からの集計 ---------------------------------------------------
+  // RawLogs は1試合1行。列は自分側/相手側が対になっている。
+
+  // カード名に現れない文字を組み合わせキーの区切りに使う。
+  const KEY_SEP = '\u001f';
+
+  function logLeaders(log, side) {
+    return [1,2,3,4].map(i => String(log[`${side}リーダー${i}`] || '').trim()).filter(Boolean);
+  }
+  function logAces(log, side) {
+    return Array.from({ length: 8 }, (_, i) => String(log[`${side}ACE${i + 1}`] || '').trim()).filter(Boolean);
+  }
+  function logTactics(log, side) {
+    return [1,2,3].map(i => String(log[`${side}戦術${i}`] || '').trim()).filter(Boolean);
+  }
+  /** 試合ごとに重複を除いたキーで [試合数, 勝数] を数える。 */
+  function tallyLogs(logs, extract) {
+    const counter = new Map();
+    logs.forEach(log => {
+      const win = log['結果'] === '勝' ? 1 : 0;
+      new Set(extract(log)).forEach(key => {
+        const entry = counter.get(key) || [0, 0];
+        entry[0] += 1; entry[1] += win;
+        counter.set(key, entry);
+      });
+    });
+    return counter;
+  }
+
+  function buildOpponentGroups(logs) {
+    if (!logs.length) return [];
+    const specs = [
+      { key: 'oppLeader', label: '相手リーダー', role: 'leader', countLabel: '遭遇数', rateLabel: '遭遇率',
+        extract: log => logLeaders(log, '相手'), perMatch: true },
+      { key: 'oppAce', label: '相手ACE', role: 'ace', countLabel: '遭遇数', rateLabel: '遭遇率',
+        extract: log => logAces(log, '相手'), perMatch: true },
+      { key: 'oppTactics', label: '相手タクティクス', role: 'tactics', countLabel: '使用数', rateLabel: '使用率',
+        extract: log => logTactics(log, '相手'), perMatch: false }
+    ];
+    return specs.map(spec => {
+      const counter = tallyLogs(logs, spec.extract);
+      // 遭遇率は総試合数が母数。タクティクスだけは延べ選択数を母数にしてG4に揃える。
+      const base = spec.perMatch
+        ? logs.length
+        : [...counter.values()].reduce((total, entry) => total + entry[0], 0);
+      const items = [...counter.entries()]
+        .map(([name, [games, wins]]) => ({
+          key: spec.key, role: spec.role, name, count: games, games, wins,
+          adoptionRate: base ? games / base : 0,
+          winRate: games ? wins / games : 0,
+          confidence: wilsonLower(wins, games)
+        }))
+        .sort((a, b) => b.count - a.count || b.winRate - a.winRate || a.name.localeCompare(b.name, 'ja'));
+      items.forEach((item, i) => { item.rank = i + 1; });
+      return { ...spec, opponent: true, items };
+    }).filter(group => group.items.length);
+  }
+
+  function buildRoundStats(logs) {
+    if (!logs.length) return [];
+    const rows = [];
+    ['合計', '先攻', '後攻'].forEach(side => {
+      ['1R', '2R', '3R'].forEach(round => {
+        const subset = side === '合計' ? logs : logs.filter(log => log['先後'] === side);
+        // 1R/2Rが同結果なら2本で決着し3Rは「-」。母数から外す。
+        const played = subset.filter(log => log[round] === '勝' || log[round] === '負');
+        const wins = played.filter(log => log[round] === '勝').length;
+        rows.push({
+          'ラウンド': round, '先後': side, '試合数': played.length, '勝数': wins,
+          '勝率': played.length ? wins / played.length : 0,
+          '信頼下限': wilsonLower(wins, played.length),
+          '構成比': logs.length ? played.length / logs.length : 0
+        });
+      });
+    });
+    return rows;
+  }
+
+  function buildDailyTrend(logs) {
+    if (!logs.length) return [];
+    const days = new Map();
+    logs.forEach(log => {
+      const serial = number(log['大会日付']);
+      if (!serial) return;
+      const day = Math.floor(serial);
+      if (!days.has(day)) days.set(day, []);
+      days.get(day).push(log);
+    });
+    return [...days.entries()].sort((a, b) => a[0] - b[0]).map(([day, group]) => {
+      const wins = group.filter(log => log['結果'] === '勝').length;
+      const first = group.filter(log => log['先後'] === '先攻').length;
+      const lead = group.filter(log => log['進行'] === '勝ち進行').length;
+      return {
+        '大会日付': day, '試合数': group.length, '勝数': wins,
+        '勝率': group.length ? wins / group.length : 0,
+        '先攻数': first, '先攻率': group.length ? first / group.length : 0,
+        '勝ち進行数': lead, '勝ち進行率': group.length ? lead / group.length : 0,
+        'ユーザー数': new Set(group.map(log => log['ユーザー名'])).size
+      };
+    });
+  }
+
+  function buildMatchups(logs) {
+    if (!logs.length) return [];
+    const counter = tallyLogs(logs, log => {
+      const mine = new Set(logLeaders(log, '自分'));
+      const theirs = new Set(logLeaders(log, '相手'));
+      const pairs = [];
+      mine.forEach(self => theirs.forEach(opponent => pairs.push(`${self}${KEY_SEP}${opponent}`)));
+      return pairs;
+    });
+    return [...counter.entries()].map(([key, [games, wins]]) => {
+      const [self, opponent] = key.split(KEY_SEP);
+      return { self, opponent, games, wins, winRate: games ? wins / games : 0, confidence: wilsonLower(wins, games) };
+    }).sort((a, b) => b.games - a.games || b.winRate - a.winRate);
+  }
+
+  function buildSynergy(logs) {
+    if (!logs.length) return [];
+    const counter = tallyLogs(logs, log => {
+      const leaders = [...new Set(logLeaders(log, '自分'))].sort((a, b) => a.localeCompare(b, 'ja'));
+      const pairs = [];
+      for (let i = 0; i < leaders.length; i += 1) {
+        for (let j = i + 1; j < leaders.length; j += 1) pairs.push(`${leaders[i]}${KEY_SEP}${leaders[j]}`);
+      }
+      return pairs;
+    });
+    const rows = [...counter.entries()].map(([key, [games, wins]]) => {
+      const [a, b] = key.split(KEY_SEP);
+      return {
+        a, b, games, wins,
+        pairRate: logs.length ? games / logs.length : 0,
+        winRate: games ? wins / games : 0,
+        confidence: wilsonLower(wins, games),
+        search: normalizeText(`${a} ${b}`)
+      };
+    }).sort((x, y) => y.confidence - x.confidence || y.games - x.games);
+    rows.forEach((row, i) => { row.rank = i + 1; });
+    return rows;
+  }
+
   function renderAll() {
     renderOverview();
     renderDecks();
     renderCardTabs();
     renderCards();
     initializeTactics();
+    initializeMatchup();
     renderLogs();
   }
 
@@ -402,10 +591,85 @@
     $('#leaderSpotlight').innerHTML = spotlightHTML(getGroup('leader'), 'leader', false);
     $('#aceSpotlight').innerHTML = spotlightHTML(getGroup('ace'), 'ace', false);
     $('#tacticsSpotlight').innerHTML = spotlightHTML(getGroup('tactics'), 'tactics', true);
+    renderRoundChart();
+    renderDailyTrend();
     const noteKeys = ['記載方針', '進行の定義', '信頼下限'];
     $('#summaryNotes').innerHTML = noteKeys.filter(key => summary.has(key)).map(key => `<div class="note"><b>${escapeHtml(key)}</b><p>${escapeHtml(summary.get(key))}</p></div>`).join('');
     hydrateCardImages($('[data-view-panel="overview"]'));
     animateVisuals($('[data-view-panel="overview"]'));
+  }
+
+  function renderRoundChart() {
+    const rows = state.prepared.roundStats || [];
+    const container = $('#roundChart');
+    if (!container) return;
+    if (!rows.length) return void (container.innerHTML = '<div class="empty-state">ラウンド別データがない。</div>');
+    const pick = (round, side) => rows.find(row => row['ラウンド'] === round && row['先後'] === side) || {};
+    const palettes = [
+      { accent: 'var(--cyan)', gradient: 'linear-gradient(90deg,var(--cyan),var(--holo-a))' },
+      { accent: 'var(--violet)', gradient: 'linear-gradient(90deg,var(--violet),var(--holo-b))' },
+      { accent: 'var(--magenta)', gradient: 'linear-gradient(90deg,var(--magenta),var(--holo-c))' }
+    ];
+    container.innerHTML = ['1R', '2R', '3R'].map((round, index) => {
+      const total = pick(round, '合計');
+      const first = pick(round, '先攻');
+      const second = pick(round, '後攻');
+      const rate = number(total['勝率']);
+      return `<div class="round-row" style="--round-color:${palettes[index].accent}">
+        <div class="round-row__head">
+          <div><strong>${round}</strong><small>${formatInt(total['試合数'])}試合</small></div>
+          <span class="round-row__rate">${percent(rate, 1)}</span>
+        </div>
+        <div class="rate-bar"><i data-bar="${Math.max(rate * 100, 1)}%" style="--bar-gradient:${palettes[index].gradient}"></i></div>
+        <div class="round-row__split"><span>先攻 <b>${percent(first['勝率'], 1)}</b></span><span>後攻 <b>${percent(second['勝率'], 1)}</b></span></div>
+      </div>`;
+    }).join('') + `<p class="round-chart__note">3Rは1R/2Rが同結果で決着した試合を母数から除いている。</p>`;
+  }
+
+  function renderDailyTrend() {
+    const rows = state.prepared.dailyTrend || [];
+    const container = $('#dailyTrendChart');
+    if (!container) return;
+    if (!rows.length) return void (container.innerHTML = '<div class="empty-state">日別データがない。</div>');
+
+    // 試合数を棒、勝率を折れ線で重ねた軽量なSVG。外部ライブラリは使わない。
+    // SVGは横方向に引き伸ばして描くため、文字は歪まないHTML側へ出す。
+    const W = 1000, H = 300, PAD_X = 12, PAD_T = 14, PAD_B = 10;
+    const innerW = W - PAD_X * 2;
+    const innerH = H - PAD_T - PAD_B;
+    const maxGames = Math.max(...rows.map(row => number(row['試合数'])), 1);
+    const step = innerW / rows.length;
+    const barW = step * .56;
+    const x = i => PAD_X + step * (i + .5);
+    const yRate = value => PAD_T + innerH * (1 - Math.min(Math.max(value, 0), 1));
+
+    const tip = row => `${formatExcelDate(row['大会日付'])} ／ ${formatInt(row['試合数'])}試合 ／ 勝率 ${percent(row['勝率'], 1)}`;
+    const bars = rows.map((row, i) => {
+      const height = innerH * (number(row['試合数']) / maxGames);
+      return `<rect x="${(x(i) - barW / 2).toFixed(1)}" y="${(PAD_T + innerH - height).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(height, 2).toFixed(1)}" class="trend-bar"><title>${escapeHtml(tip(row))}</title></rect>`;
+    }).join('');
+    const points = rows.map((row, i) => `${x(i).toFixed(1)},${yRate(number(row['勝率'])).toFixed(1)}`).join(' ');
+
+    const labels = rows.map((row, i) => {
+      if (rows.length > 10 && i % 3 !== 0 && i !== rows.length - 1) return '';
+      const short = formatExcelDate(row['大会日付']).replace(/^\d{4}\//, '');
+      return `<span style="left:${(x(i) / W * 100).toFixed(2)}%">${escapeHtml(short)}</span>`;
+    }).join('');
+
+    const totalGames = sum(rows.map(row => row['試合数']));
+    const totalWins = sum(rows.map(row => row['勝数']));
+    container.innerHTML = `<div class="trend-plot">
+        <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="日別の試合数と勝率" preserveAspectRatio="none">
+          <line x1="${PAD_X}" x2="${W - PAD_X}" y1="${yRate(.5).toFixed(1)}" y2="${yRate(.5).toFixed(1)}" class="trend-baseline"/>
+          ${bars}<polyline points="${points}" class="trend-line"/>
+        </svg>
+        <b class="trend-mark" style="top:${(yRate(.5) / H * 100).toFixed(2)}%">50%</b>
+      </div>
+      <div class="trend-axis">${labels}</div>
+      <div class="trend-legend">
+        <span class="trend-legend__bar">試合数</span><span class="trend-legend__line">勝率</span>
+        <span class="trend-legend__total">${formatInt(rows.length)}日 / ${formatInt(totalGames)}試合 / 通算 ${percent(totalGames ? totalWins / totalGames : 0, 1)}</span>
+      </div>`;
   }
 
   function spotlightHTML(items, role, isUsage) {
@@ -537,20 +801,24 @@
     const sort = $('#cardSort').value;
     const sorters = {
       adoption: (a,b) => b.adoptionRate - a.adoptionRate || b.count - a.count,
+      confidence: (a,b) => b.confidence - a.confidence || b.games - a.games,
       winrate: (a,b) => b.winRate - a.winRate || b.games - a.games,
       games: (a,b) => b.games - a.games || b.winRate - a.winRate,
       count: (a,b) => b.count - a.count || b.adoptionRate - a.adoptionRate
     };
     const list = [...group.items].filter(item => !query || normalizeText(item.name).includes(query)).sort(sorters[sort] || sorters.adoption);
     const maxRate = Math.max(...list.map(item => item.adoptionRate), .01);
+    const rateLabel = group.rateLabel || '採用率';
+    const countLabel = group.countLabel || '採用数';
+    const winLabel = group.opponent ? '対面勝率' : '勝率';
     $('#cardCountBadge strong').textContent = formatInt(list.length);
-    $('#cardStatsList').innerHTML = list.length ? list.map((item, index) => `<article class="card-stat">
+    $('#cardStatsList').innerHTML = list.length ? list.map((item, index) => `<article class="card-stat${group.opponent ? ' card-stat--opponent' : ''}">
       <span class="card-stat__rank">${String(index + 1).padStart(2, '0')}</span>
       ${cardArtHTML(item.name, group.role, 'lg')}
-      <div class="card-stat__body"><h3>${escapeHtml(item.name)}</h3>
-        <div class="card-stat__headline"><div><span>${group.key === 'tactics' ? '使用率' : '採用率'}</span><strong>${percent(item.adoptionRate, 1)}</strong></div><div><span>勝率</span><strong>${percent(item.winRate, 1)}</strong></div></div>
+      <div class="card-stat__body"><h3>${escapeHtml(item.name)}${group.opponent ? '<em class="card-stat__side">VS</em>' : ''}</h3>
+        <div class="card-stat__headline"><div><span>${rateLabel}</span><strong>${percent(item.adoptionRate, 1)}</strong></div><div><span>${winLabel}</span><strong>${percent(item.winRate, 1)}</strong></div></div>
         <div class="card-stat__bar"><div class="rate-bar"><i data-bar="${Math.max(item.adoptionRate / maxRate * 100, 1)}%"></i></div></div>
-        <div class="card-stat__minor"><div><span>${group.key === 'tactics' ? '使用数' : '採用数'}</span><strong>${formatInt(item.count)}</strong></div><div><span>試合数</span><strong>${formatInt(item.games)}</strong></div><div><span>勝数</span><strong>${formatInt(item.wins)}</strong></div></div>
+        <div class="card-stat__minor"><div><span>${countLabel}</span><strong>${formatInt(item.count)}</strong></div><div><span>試合数</span><strong>${formatInt(item.games)}</strong></div><div><span>信頼下限</span><strong>${percent(item.confidence, 1)}</strong></div></div>
       </div>
     </article>`).join('') : '<div class="empty-state"><strong>該当するカードがない</strong>検索語を変えて。</div>';
     hydrateCardImages($('#cardStatsList'));
@@ -636,6 +904,147 @@
     }).join('') : '<div class="empty-state"><strong>このデッキの戦術データがない</strong>別のデッキを選択して。</div>';
     hydrateCardImages($('[data-view-panel="tactics"]'));
     animateVisuals($('[data-view-panel="tactics"]'));
+  }
+
+  function leaderStatsMap() {
+    const group = state.prepared.cardGroups.find(item => item.key === 'leader');
+    return new Map((group?.items || []).map(item => [item.name, item]));
+  }
+  function matchupSelfLeaders() {
+    const stats = leaderStatsMap();
+    const names = [...new Set(state.prepared.matchups.map(item => item.self))];
+    return names
+      .map(name => ({ name, stat: stats.get(name) }))
+      .sort((a, b) => number(b.stat?.games) - number(a.stat?.games) || a.name.localeCompare(b.name, 'ja'));
+  }
+  function initializeMatchup() {
+    if (!state.prepared.matchups.length && !state.prepared.synergy.length) {
+      $('#matchupPane').innerHTML = '<div class="empty-state"><strong>対面データがない</strong>RawLogsに相手リーダーの記録が必要。</div>';
+      $('#synergyPane').innerHTML = '';
+      return;
+    }
+    const leaders = matchupSelfLeaders();
+    state.matchupLeader = leaders[0]?.name || '';
+    state.synergyLimit = 24;
+    renderMatchup();
+  }
+  function renderMatchup() {
+    if (!state.prepared) return;
+    const synergy = state.matchupMode === 'synergy';
+    $('#matchupPane').hidden = synergy;
+    $('#synergyPane').hidden = !synergy;
+    $('#matchupSearch').placeholder = synergy ? 'リーダー名で検索' : '自分のリーダーを検索';
+    if (synergy) renderSynergy(); else renderMatchupBoard();
+    animateVisuals($('[data-view-panel="matchup"]'));
+  }
+
+  function renderMatchupBoard() {
+    const query = normalizeText($('#matchupSearch').value);
+    const leaders = matchupSelfLeaders();
+    const visible = leaders.filter(item => !query || normalizeText(item.name).includes(query));
+    if (visible.length && !visible.some(item => item.name === state.matchupLeader)) {
+      state.matchupLeader = visible[0].name;
+    }
+    $('#matchupLeaderRail').innerHTML = visible.length ? visible.map(item => `
+      <button class="matchup-chip ${item.name === state.matchupLeader ? 'is-active' : ''}" type="button" data-matchup-leader="${encodeURIComponent(item.name)}">
+        ${cardArtHTML(item.name, 'leader', 'sm')}
+        <b>${escapeHtml(item.name)}</b>
+        <small>${formatInt(item.stat?.games)}試合 / ${percent(item.stat?.winRate, 0)}</small>
+      </button>`).join('') : '<div class="empty-state">該当するリーダーがいない。</div>';
+
+    const stats = leaderStatsMap().get(state.matchupLeader);
+    const minGames = Math.max(1, number($('#matchupMinGames').value) || 1);
+    const sort = $('#matchupSort').value;
+    const sorters = {
+      confidence: (a, b) => b.confidence - a.confidence || b.games - a.games,
+      winrate: (a, b) => b.winRate - a.winRate || b.games - a.games,
+      games: (a, b) => b.games - a.games || b.winRate - a.winRate
+    };
+    const rows = state.prepared.matchups
+      .filter(item => item.self === state.matchupLeader && item.games >= minGames)
+      .sort(sorters[sort] || sorters.confidence);
+    $('#matchupCountBadge strong').textContent = formatInt(rows.length);
+
+    const best = [...rows].sort((a, b) => b.confidence - a.confidence)[0];
+    const worst = [...rows].sort((a, b) => a.confidence - b.confidence)[0];
+    const totalGames = sum(rows.map(item => item.games));
+    const totalWins = sum(rows.map(item => item.wins));
+
+    $('#matchupDetail').innerHTML = state.matchupLeader ? `
+      <div class="panel__head">
+        <div><p class="kicker">VS OPPONENT LEADERS</p><h3>${escapeHtml(state.matchupLeader)} の対面成績</h3></div>
+        <span class="panel__meta">MIN ${formatInt(minGames)} GAMES</span>
+      </div>
+      <div class="matchup-summary">
+        <div class="matchup-summary__art">${cardArtHTML(state.matchupLeader, 'leader', 'lg')}</div>
+        <div class="matchup-summary__metrics">
+          <div><span>採用試合</span><strong>${formatInt(stats?.games)}</strong></div>
+          <div><span>単体勝率</span><strong>${percent(stats?.winRate, 1)}</strong></div>
+          <div><span>対面数</span><strong>${formatInt(rows.length)}</strong></div>
+          <div><span>対面通算</span><strong>${percent(totalGames ? totalWins / totalGames : 0, 1)}</strong></div>
+        </div>
+        <div class="matchup-summary__edges">
+          ${edgeHTML('得意', best, 'is-good')}
+          ${edgeHTML('苦手', worst, 'is-bad')}
+        </div>
+      </div>
+      <div class="matchup-list">${rows.length ? rows.map(matchupRowHTML).join('')
+        : '<div class="empty-state"><strong>条件に合う対面がない</strong>最低試合数を下げて。</div>'}</div>
+      <p class="panel__note">バーは勝率50%を中心に、右へ伸びるほど有利。試合数が少ない対面は信頼下限が大きく下がる。</p>`
+      : '<div class="empty-state">リーダーを選択して。</div>';
+    hydrateCardImages($('[data-view-panel="matchup"]'));
+  }
+  function edgeHTML(label, item, tone) {
+    if (!item) return `<div class="matchup-edge"><span>${label}</span><b>—</b></div>`;
+    return `<div class="matchup-edge ${tone}"><span>${label}</span><b>${escapeHtml(item.opponent)}</b><i>${percent(item.winRate, 1)} / ${formatInt(item.games)}試合</i></div>`;
+  }
+  function matchupRowHTML(item) {
+    const rate = number(item.winRate);
+    const tone = rate >= .55 ? 'is-good' : rate <= .45 ? 'is-bad' : 'is-even';
+    return `<div class="matchup-row ${tone}">
+      ${cardArtHTML(item.opponent, 'leader', 'xs')}
+      <div class="matchup-row__name"><b>${escapeHtml(item.opponent)}</b><small>${formatInt(item.wins)}勝 / ${formatInt(item.games)}試合</small></div>
+      <div class="mu-bar"><i data-bar="${Math.max(Math.abs(rate - .5) * 100, .8)}%" style="left:${(Math.min(rate, .5) * 100).toFixed(2)}%"></i></div>
+      <div class="matchup-row__rate"><b>${percent(rate, 1)}</b><small>下限 ${percent(item.confidence, 1)}</small></div>
+    </div>`;
+  }
+
+  function renderSynergy() {
+    const query = normalizeText($('#matchupSearch').value);
+    const minGames = Math.max(1, number($('#matchupMinGames').value) || 1);
+    const sort = $('#matchupSort').value;
+    const sorters = {
+      confidence: (a, b) => b.confidence - a.confidence || b.games - a.games,
+      winrate: (a, b) => b.winRate - a.winRate || b.games - a.games,
+      games: (a, b) => b.games - a.games || b.winRate - a.winRate
+    };
+    const rows = state.prepared.synergy
+      .filter(item => item.games >= minGames && (!query || item.search.includes(query)))
+      .sort(sorters[sort] || sorters.confidence);
+    $('#matchupCountBadge strong').textContent = formatInt(rows.length);
+    const visible = rows.slice(0, state.synergyLimit);
+    $('#synergyList').innerHTML = visible.length ? visible.map((item, index) => `
+      <article class="synergy-card">
+        <span class="synergy-card__rank">${String(index + 1).padStart(2, '0')}</span>
+        <div class="synergy-card__pair">
+          ${cardArtHTML(item.a, 'leader', 'sm')}
+          <span class="synergy-card__plus" aria-hidden="true">＋</span>
+          ${cardArtHTML(item.b, 'leader', 'sm')}
+        </div>
+        <div class="synergy-card__body">
+          <h3>${escapeHtml(item.a)} ＋ ${escapeHtml(item.b)}</h3>
+          <div class="synergy-card__metrics">
+            <div><span>勝率</span><strong>${percent(item.winRate, 1)}</strong></div>
+            <div><span>信頼下限</span><strong>${percent(item.confidence, 1)}</strong></div>
+            <div><span>試合数</span><strong>${formatInt(item.games)}</strong></div>
+          </div>
+          <div class="rate-bar"><i data-bar="${Math.max(number(item.confidence) * 100, 1)}%" style="--bar-gradient:linear-gradient(90deg,var(--violet),var(--holo-c))"></i></div>
+        </div>
+      </article>`).join('')
+      : '<div class="empty-state"><strong>条件に合う組み合わせがない</strong>最低試合数か検索語を変えて。</div>';
+    const more = $('#synergyMore');
+    if (more) more.hidden = visible.length >= rows.length;
+    hydrateCardImages($('#synergyList'));
   }
 
   function getFilteredLogs() {

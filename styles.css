@@ -2064,3 +2064,246 @@ html, body { overflow-x: clip; }
   }
   .main { padding-top: 10px; padding-bottom: 50px; }
 }
+
+/* ==========================================================================
+   Matchup & synergy / round breakdown / daily trend
+   相手側の集計シート（G6〜G11・M1）に対応して追加した領域
+   ========================================================================== */
+
+/* 6項目になったモバイルナビ */
+@media (max-width: 760px) {
+  .mobile-nav { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .mobile-nav b { font-size: .63rem; }
+  .mobile-nav span { font-size: .5rem; }
+}
+
+.panel__note {
+  margin: 0;
+  padding: 14px 27px 24px;
+  color: var(--muted);
+  font-size: .74rem;
+  line-height: 1.65;
+}
+
+/* --- 概要: ラウンド別勝率 --- */
+.round-chart { display: grid; gap: 18px; padding: 7px 27px 24px; }
+.round-row { display: grid; gap: 9px; padding-top: 15px; border-top: 1px solid var(--line-soft); }
+.round-row:first-child { padding-top: 4px; border-top: 0; }
+.round-row__head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.round-row__head strong {
+  display: inline-block;
+  min-width: 34px;
+  color: var(--round-color, var(--ink));
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 1.16rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+.round-row__head small { margin-left: 8px; color: var(--muted); font-size: .74rem; }
+.round-row__rate { font-size: 1.5rem; font-weight: 900; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+.round-row .rate-bar { height: 10px; border-radius: 999px; }
+.round-row__split { display: flex; gap: 18px; color: var(--muted); font-size: .72rem; }
+.round-row__split b { color: var(--ink-2); font-weight: 800; font-variant-numeric: tabular-nums; }
+.round-chart__note { margin: 0; color: var(--muted-2); font-size: .68rem; line-height: 1.6; }
+
+/* --- 概要: 日別推移 --- */
+.trend-chart { padding: 7px 27px 24px; }
+.trend-chart svg { display: block; width: 100%; height: 216px; overflow: visible; }
+.trend-bar { fill: rgba(104, 109, 120, .22); }
+.trend-line { fill: none; stroke: var(--magenta); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.trend-dot { fill: #fff; stroke: var(--magenta); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.trend-baseline { stroke: rgba(17, 18, 22, .22); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.trend-baseline-label { fill: var(--muted-2); font-size: 11px; font-weight: 800; text-anchor: end; }
+.trend-label { fill: var(--muted-2); font-size: 11px; font-weight: 700; text-anchor: middle; }
+.trend-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 14px; color: var(--muted); font-size: .72rem; }
+.trend-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.trend-legend__bar::before { content: ""; width: 13px; height: 9px; border-radius: 2px; background: rgba(104, 109, 120, .34); }
+.trend-legend__line::before { content: ""; width: 15px; height: 3px; border-radius: 2px; background: var(--magenta); }
+.trend-legend__total { margin-left: auto; color: var(--ink-2); font-weight: 750; }
+
+/* --- 対面: 自分リーダーの選択レール --- */
+.matchup-rail {
+  display: flex;
+  gap: 10px;
+  padding: 4px 27px 26px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  overscroll-behavior-x: contain;
+}
+.matchup-rail::-webkit-scrollbar { height: 7px; }
+.matchup-rail::-webkit-scrollbar-thumb { border-radius: 999px; background: rgba(17, 18, 22, .16); }
+.matchup-chip {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: 116px;
+  padding: 10px 8px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .7);
+  text-align: center;
+  transition: transform .2s var(--ease), box-shadow .2s ease, border-color .2s ease, background .2s ease;
+}
+.matchup-chip:hover { transform: translateY(-3px); border-color: rgba(20, 21, 26, .2); background: #fff; box-shadow: var(--shadow-sm); }
+.matchup-chip.is-active { border-color: var(--ink); background: #111216; box-shadow: var(--shadow-md); }
+.matchup-chip.is-active b { color: #fff; }
+.matchup-chip.is-active small { color: #fff; opacity: .68; }
+.matchup-chip b { max-width: 100%; overflow: hidden; font-size: .72rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.matchup-chip small { color: var(--muted); font-size: .62rem; font-variant-numeric: tabular-nums; }
+.matchup-chip .card-art { width: 68px; }
+
+/* --- 対面: 選択中リーダーのサマリー --- */
+.matchup-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, .85fr);
+  align-items: center;
+  gap: 22px;
+  padding: 4px 27px 22px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.matchup-summary__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--line-soft);
+}
+.matchup-summary__metrics > div { padding: 12px 10px; background: rgba(255, 255, 255, .92); }
+.matchup-summary__metrics span { display: block; color: var(--muted); font-size: .66rem; font-weight: 700; }
+.matchup-summary__metrics strong { display: block; margin-top: 3px; font-size: 1.24rem; font-weight: 900; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.matchup-summary__edges { display: grid; gap: 8px; }
+.matchup-edge {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border-left: 3px solid var(--muted-2);
+  border-radius: 0 12px 12px 0;
+  background: var(--surface-soft);
+}
+.matchup-edge.is-good { border-left-color: var(--win); background: var(--win-soft); }
+.matchup-edge.is-bad { border-left-color: var(--lose); background: var(--lose-soft); }
+.matchup-edge span { color: var(--muted); font-size: .66rem; font-weight: 900; letter-spacing: .06em; }
+.matchup-edge b { overflow: hidden; font-size: .84rem; font-weight: 820; text-overflow: ellipsis; white-space: nowrap; }
+.matchup-edge i { grid-column: 2; color: var(--muted); font-size: .66rem; font-style: normal; font-variant-numeric: tabular-nums; }
+
+/* --- 対面: 相手リーダー別の一覧（勝率50%を中心に左右へ発散するバー） --- */
+.matchup-list { display: grid; padding: 6px 27px 0; }
+.matchup-row {
+  display: grid;
+  grid-template-columns: 38px minmax(120px, .9fr) minmax(0, 1.6fr) 96px;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.matchup-row:last-child { border-bottom: 0; }
+.matchup-row__name { min-width: 0; }
+.matchup-row__name b { display: block; overflow: hidden; font-size: .84rem; font-weight: 780; text-overflow: ellipsis; white-space: nowrap; }
+.matchup-row__name small { display: block; margin-top: 1px; color: var(--muted); font-size: .66rem; font-variant-numeric: tabular-nums; }
+.matchup-row__rate { text-align: right; }
+.matchup-row__rate b { display: block; font-size: 1.02rem; font-weight: 900; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.matchup-row__rate small { display: block; color: var(--muted-2); font-size: .62rem; font-variant-numeric: tabular-nums; }
+.mu-bar { position: relative; height: 14px; border-radius: 999px; background: rgba(104, 109, 120, .13); }
+.mu-bar::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: rgba(17, 18, 22, .28); }
+.mu-bar i { position: absolute; top: 0; bottom: 0; width: 0; border-radius: 999px; background: var(--muted-2); transition: width 1s var(--ease); }
+.matchup-row.is-good .mu-bar i { background: linear-gradient(90deg, rgba(0, 133, 94, .55), var(--win)); }
+.matchup-row.is-good .matchup-row__rate b { color: var(--win); }
+.matchup-row.is-bad .mu-bar i { background: linear-gradient(90deg, var(--lose), rgba(196, 59, 75, .55)); }
+.matchup-row.is-bad .matchup-row__rate b { color: var(--lose); }
+
+/* --- 相性: リーダーペア --- */
+.synergy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.synergy-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 30px auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line-soft);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, .84);
+  box-shadow: var(--shadow-sm);
+}
+.synergy-card__rank { align-self: start; color: var(--muted-2); font-family: "Palatino Linotype", Palatino, serif; font-size: 1.4rem; }
+.synergy-card__pair { display: flex; align-items: center; gap: 7px; }
+.synergy-card__pair .card-art { width: 66px; }
+.synergy-card__plus { color: var(--muted-2); font-size: .82rem; font-weight: 900; }
+.synergy-card__body { min-width: 0; }
+.synergy-card__body h3 { margin: 0 0 12px; overflow-wrap: anywhere; font-size: .95rem; font-weight: 820; line-height: 1.4; }
+.synergy-card__metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 11px; }
+.synergy-card__metrics span { display: block; color: var(--muted); font-size: .64rem; }
+.synergy-card__metrics strong { display: block; margin-top: 2px; font-size: 1.02rem; font-weight: 880; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.synergy-card .rate-bar { height: 8px; border-radius: 999px; }
+
+/* --- カード統計: 相手側タブ --- */
+.card-stat--opponent { border-color: rgba(236, 75, 154, .24); background: linear-gradient(180deg, rgba(255, 242, 248, .72), rgba(255, 255, 255, .86)); }
+.card-stat__side {
+  margin-left: 9px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  color: #fff;
+  background: var(--magenta);
+  font-size: .58rem;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: .1em;
+  vertical-align: middle;
+}
+
+@media (max-width: 1250px) {
+  .synergy-grid { grid-template-columns: 1fr; }
+  .matchup-summary { grid-template-columns: auto minmax(0, 1fr); }
+  .matchup-summary__edges { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 760px) {
+  .round-chart, .trend-chart, .matchup-rail, .matchup-summary, .matchup-list, .panel__note { padding-inline: 16px; }
+  .trend-chart svg { height: 190px; }
+  .trend-legend__total { flex-basis: 100%; margin-left: 0; }
+  .matchup-summary { grid-template-columns: minmax(0, 1fr); gap: 14px; padding-bottom: 18px; }
+  .matchup-summary__art { display: none; }
+  .matchup-summary__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .matchup-summary__edges { grid-template-columns: 1fr; }
+  .matchup-row { grid-template-columns: 30px minmax(0, 1fr) 78px; gap: 10px; row-gap: 8px; }
+  .matchup-row .mu-bar { grid-column: 1 / -1; }
+  .synergy-card { grid-template-columns: 24px minmax(0, 1fr); gap: 12px; padding: 14px; }
+  .synergy-card__pair, .synergy-card__body { grid-column: 2; }
+  .matchup-chip { width: 100px; }
+  .matchup-chip .card-art { width: 58px; }
+}
+
+/* --- 概要: 日別推移（SVGは形だけ・文字はHTML側なので歪まない） --- */
+.trend-plot { position: relative; }
+.trend-chart svg { display: block; width: 100%; height: 200px; }
+.trend-bar { fill: rgba(104, 109, 120, .2); }
+.trend-bar:hover { fill: rgba(104, 109, 120, .38); }
+.trend-line { fill: none; stroke: var(--magenta); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.trend-baseline { stroke: rgba(17, 18, 22, .24); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.trend-mark {
+  position: absolute;
+  right: 0;
+  transform: translateY(-100%);
+  padding: 0 4px;
+  color: var(--muted-2);
+  font-size: .62rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+.trend-axis { position: relative; height: 17px; margin-top: 4px; }
+.trend-axis span {
+  position: absolute;
+  transform: translateX(-50%);
+  color: var(--muted-2);
+  font-size: .62rem;
+  font-weight: 750;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 760px) {
+  .trend-chart svg { height: 168px; }
+}

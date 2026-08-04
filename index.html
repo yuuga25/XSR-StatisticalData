@@ -65,7 +65,8 @@
         <button class="nav__item" type="button" data-view="decks"><span>02</span><b>デッキ</b></button>
         <button class="nav__item" type="button" data-view="cards"><span>03</span><b>カード</b></button>
         <button class="nav__item" type="button" data-view="tactics"><span>04</span><b>戦術</b></button>
-        <button class="nav__item" type="button" data-view="logs"><span>05</span><b>対戦ログ</b></button>
+        <button class="nav__item" type="button" data-view="matchup"><span>05</span><b>対面</b></button>
+        <button class="nav__item" type="button" data-view="logs"><span>06</span><b>対戦ログ</b></button>
       </nav>
       <div class="topbar__context">
         <div><span>PERIOD</span><strong id="topPeriod">—</strong></div>
@@ -84,7 +85,8 @@
         <button class="nav__item" type="button" data-view="decks"><span class="nav__number">02</span><span><b>デッキ</b><small>Deck analysis</small></span></button>
         <button class="nav__item" type="button" data-view="cards"><span class="nav__number">03</span><span><b>カード統計</b><small>Card performance</small></span></button>
         <button class="nav__item" type="button" data-view="tactics"><span class="nav__number">04</span><span><b>戦術構成</b><small>Tactics order</small></span></button>
-        <button class="nav__item" type="button" data-view="logs"><span class="nav__number">05</span><span><b>対戦ログ</b><small>Match records</small></span></button>
+        <button class="nav__item" type="button" data-view="matchup"><span class="nav__number">05</span><span><b>対面・相性</b><small>Matchup &amp; synergy</small></span></button>
+        <button class="nav__item" type="button" data-view="logs"><span class="nav__number">06</span><span><b>対戦ログ</b><small>Match records</small></span></button>
       </nav>
       <div class="sidebar__status"><i></i><span><b>DATA ONLINE</b><small id="sidebarGames">—</small></span></div>
     </aside>
@@ -95,7 +97,8 @@
       <button type="button" data-view="decks"><span>02</span><b>デッキ</b></button>
       <button type="button" data-view="cards"><span>03</span><b>カード</b></button>
       <button type="button" data-view="tactics"><span>04</span><b>戦術</b></button>
-      <button type="button" data-view="logs"><span>05</span><b>ログ</b></button>
+      <button type="button" data-view="matchup"><span>05</span><b>対面</b></button>
+      <button type="button" data-view="logs"><span>06</span><b>ログ</b></button>
     </nav>
 
     <main id="mainContent" class="main">
@@ -123,6 +126,17 @@
           <article class="panel panel--tall">
             <div class="panel__head"><div><p class="kicker">ROUND FLOW</p><h3>進行別の勝率</h3></div><span class="panel__meta">ROUND 1</span></div>
             <div id="leadFlowChart" class="flow-chart"></div>
+          </article>
+        </div>
+
+        <div class="layout-two motion-group">
+          <article class="panel panel--tall">
+            <div class="panel__head"><div><p class="kicker">ROUND BREAKDOWN</p><h3>ラウンド別の勝率</h3></div><span class="panel__meta">1R / 2R / 3R</span></div>
+            <div id="roundChart" class="round-chart"></div>
+          </article>
+          <article class="panel panel--tall">
+            <div class="panel__head"><div><p class="kicker">DAILY TREND</p><h3>日別の推移</h3></div><span class="panel__meta">MATCHES / WIN RATE</span></div>
+            <div id="dailyTrendChart" class="trend-chart"></div>
           </article>
         </div>
 
@@ -161,7 +175,7 @@
         <div class="control-bar motion-item">
           <div id="cardTypeTabs" class="tabs"></div>
           <label class="search-control"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="cardSearch" type="search" placeholder="カード名で検索"></label>
-          <label class="select-control"><span>並び順</span><select id="cardSort"><option value="adoption">採用・使用率</option><option value="winrate">勝率</option><option value="games">試合数</option><option value="count">採用・使用数</option></select></label>
+          <label class="select-control"><span>並び順</span><select id="cardSort"><option value="adoption">採用・使用率</option><option value="confidence">信頼下限</option><option value="winrate">勝率</option><option value="games">試合数</option><option value="count">採用・使用数</option></select></label>
         </div>
         <div id="cardStatsList" class="card-stats-grid motion-group"></div>
       </section>
@@ -175,6 +189,33 @@
         <div id="tacticDeckRail" class="tactic-deck-rail motion-item" aria-label="デッキ候補"></div>
         <article id="selectedTacticDeck" class="selected-deck motion-item"></article>
         <div id="tacticSequenceList" class="sequence-list motion-group"></div>
+      </section>
+
+      <section class="view" data-view-panel="matchup">
+        <div class="page-head motion-item"><div><p class="kicker">MATCHUP &amp; SYNERGY</p><h2>対面・相性</h2><p>相手リーダーとの対面成績と、リーダー2体の噛み合い</p></div><div id="matchupCountBadge" class="count-badge"><span>RESULT</span><strong>—</strong></div></div>
+        <div class="control-bar motion-item">
+          <div id="matchupModeTabs" class="tabs"><button class="is-active" type="button" data-matchup-mode="matchup">対面</button><button type="button" data-matchup-mode="synergy">リーダー相性</button></div>
+          <label class="search-control search-control--wide"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="matchupSearch" type="search" placeholder="リーダー名で検索"></label>
+          <label class="select-control"><span>最低試合数</span><input id="matchupMinGames" type="number" min="1" step="1" value="10"></label>
+          <label class="select-control"><span>並び順</span><select id="matchupSort"><option value="confidence">信頼下限</option><option value="winrate">勝率</option><option value="games">試合数</option></select></label>
+        </div>
+
+        <div id="matchupPane">
+          <article class="panel motion-item">
+            <div class="panel__head"><div><p class="kicker">YOUR LEADER</p><h3>自分のリーダーを選ぶ</h3></div><span class="panel__meta">SELECT TO COMPARE</span></div>
+            <div id="matchupLeaderRail" class="matchup-rail"></div>
+          </article>
+          <article id="matchupDetail" class="panel motion-item"></article>
+        </div>
+
+        <div id="synergyPane" hidden>
+          <article class="panel motion-item">
+            <div class="panel__head"><div><p class="kicker">LEADER SYNERGY</p><h3>同時採用の相性</h3></div><span class="panel__meta">WILSON LOWER BOUND</span></div>
+            <p class="panel__note">同じデッキに入っていた2体の組み合わせ。1試合につき6ペアを数えているため、合計は総試合数と一致しない。</p>
+          </article>
+          <div id="synergyList" class="synergy-grid motion-group"></div>
+          <div class="load-more"><button id="synergyMore" class="button button--ghost" type="button">さらに表示</button></div>
+        </div>
       </section>
 
       <section class="view" data-view-panel="logs">
