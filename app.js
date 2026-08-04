@@ -6,7 +6,7 @@
   const AAD_TEXT = 'Xross Stats Dashboard v1';
   const PBKDF2_ITERATIONS = 350000;
   const SESSION_KEY = 'xrossStatsSessionPassword';
-  const LOG_PAGE_SIZE = 24;
+  const LOG_PAGE_SIZE = 12;
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -123,13 +123,35 @@
     let tacticTimer;
     $('#tacticDeckSearch').addEventListener('input', event => {
       clearTimeout(tacticTimer);
-      tacticTimer = setTimeout(() => selectTacticDeck(event.target.value), 180);
+      tacticTimer = setTimeout(() => {
+        renderTacticDeckChoices(event.target.value);
+        const exact = [...state.prepared.tacticGroups.keys()].find(deck => normalizeText(deck) === normalizeText(event.target.value));
+        if (exact) selectTacticDeck(exact, true);
+      }, 120);
     });
     $('#tacticDeckSearch').addEventListener('change', event => selectTacticDeck(event.target.value, true));
     $('#popularTacticDeck').addEventListener('click', () => selectPopularTacticDeck(true));
+    $('#tacticDeckRail').addEventListener('click', event => {
+      const button = event.target.closest('[data-tactic-deck]');
+      if (!button) return;
+      selectTacticDeck(decodeURIComponent(button.dataset.tacticDeck), true);
+    });
 
     ['logSearch', 'logTurn', 'logResult', 'logLead'].forEach(id => {
       $(`#${id}`).addEventListener(id === 'logSearch' ? 'input' : 'change', () => { state.logPage = 1; renderLogs(); });
+    });
+    $('#clearLogFilters').addEventListener('click', () => {
+      $('#logSearch').value = '';
+      $('#logTurn').value = '';
+      $('#logResult').value = '';
+      $('#logLead').value = '';
+      state.logPage = 1;
+      renderLogs();
+    });
+    $('#logFilterToggle').addEventListener('click', () => {
+      const filters = $('#logAdvancedFilters');
+      const open = filters.classList.toggle('is-open');
+      $('#logFilterToggle').setAttribute('aria-expanded', String(open));
     });
   }
 
@@ -228,20 +250,10 @@
       ...config,
       items: recordsFromSheet(data, config.sheet, 1).map((record, i) => normalizeCardStat(record, config, i))
     }));
-    const tacticGroups = new Map();
-    for (const row of recordsFromSheet(data, '_T1_Data', 1)) {
-      const deck = String(row['デッキ'] || '').trim();
-      if (!deck) continue;
-      if (!tacticGroups.has(deck)) tacticGroups.set(deck, []);
-      tacticGroups.get(deck).push({
-        order: String(row['タクティクス並び'] || ''), uses: number(row['使用数']), useRate: number(row['使用率']),
-        games: number(row['試合数']), wins: number(row['勝数']), winRate: number(row['勝率'])
-      });
-    }
-    for (const list of tacticGroups.values()) list.sort((a, b) => b.uses - a.uses || b.games - a.games);
-    const logs = recordsFromSheet(data, 'RawLogs', 1).map((record, index) => ({
-      ...record, __index: index, __search: normalizeText(Object.values(record).filter(value => value != null).join(' '))
-    }));
+    const logs = recordsFromSheet(data, 'RawLogs', 1)
+      .map((record, index) => sanitizeLogRecord(record, index))
+      .sort((a, b) => number(b['大会日付']) - number(a['大会日付']) || number(b['更新日時']) - number(a['更新日時']) || number(b['対戦番号']) - number(a['対戦番号']));
+    const tacticGroups = buildTacticGroups(data, logs);
     return {
       summary, decks, cardGroups,
       firstSecond: recordsFromSheet(data, 'G1_FirstSecond', 1),
@@ -284,6 +296,57 @@
       count: number(record[config.countKey]), adoptionRate: number(record[config.rateKey]), games: number(record['試合数']),
       wins: number(record['勝数']), winRate: number(record['勝率']), raw: record
     };
+  }
+
+  const RAW_LOG_HIDDEN_FIELDS = new Set(['ownerUid', 'ログID', 'ドキュメントID', 'ステータス']);
+  function sanitizeLogRecord(record, index) {
+    const clean = { __index: index };
+    Object.entries(record).forEach(([key, value]) => {
+      if (!RAW_LOG_HIDDEN_FIELDS.has(key)) clean[key] = value;
+    });
+    const searchable = Object.entries(clean)
+      .filter(([key, value]) => !key.startsWith('__') && value != null)
+      .map(([, value]) => value)
+      .join(' ');
+    clean.__search = normalizeText(searchable);
+    return clean;
+  }
+  function buildTacticGroups(data, logs) {
+    const groups = new Map();
+    const add = (deck, item) => {
+      if (!deck || !item.order || item.order.includes('#NAME?')) return;
+      if (!groups.has(deck)) groups.set(deck, []);
+      groups.get(deck).push(item);
+    };
+    for (const row of recordsFromSheet(data, '_T1_Data', 1)) {
+      const deck = String(row['デッキ'] || '').trim();
+      const order = String(row['タクティクス並び'] || '').trim();
+      add(deck, {
+        order,
+        uses: number(row['使用数']), useRate: number(row['使用率']),
+        games: number(row['試合数']), wins: number(row['勝数']), winRate: number(row['勝率'])
+      });
+    }
+    if (!groups.size) {
+      const counters = new Map();
+      logs.forEach(log => {
+        const leaders = [1,2,3,4].map(i => String(log[`自分リーダー${i}`] || '').trim()).filter(Boolean);
+        const aces = Array.from({ length: 8 }, (_, i) => String(log[`自分ACE${i + 1}`] || '').trim()).filter(Boolean);
+        const tactics = [1,2,3].map(i => String(log[`自分戦術${i}`] || '').trim()).filter(Boolean);
+        if (leaders.length !== 4 || !tactics.length) return;
+        const deck = `${leaders.join(' / ')} ＋ ${aces.join(' / ')}`;
+        const order = tactics.join(' → ');
+        const key = `${deck}::TACTIC::${order}`;
+        const counter = counters.get(key) || { deck, order, uses: 0, games: 0, wins: 0 };
+        counter.uses += 1; counter.games += 1; counter.wins += log['結果'] === '勝' ? 1 : 0;
+        counters.set(key, counter);
+      });
+      const totals = new Map();
+      counters.forEach(item => totals.set(item.deck, (totals.get(item.deck) || 0) + item.uses));
+      counters.forEach(item => add(item.deck, { ...item, useRate: item.uses / Math.max(totals.get(item.deck) || 1, 1), winRate: item.wins / Math.max(item.games, 1) }));
+    }
+    for (const list of groups.values()) list.sort((a, b) => b.uses - a.uses || b.games - a.games || b.winRate - a.winRate);
+    return groups;
   }
 
   function renderAll() {
@@ -339,7 +402,7 @@
     $('#leaderSpotlight').innerHTML = spotlightHTML(getGroup('leader'), 'leader', false);
     $('#aceSpotlight').innerHTML = spotlightHTML(getGroup('ace'), 'ace', false);
     $('#tacticsSpotlight').innerHTML = spotlightHTML(getGroup('tactics'), 'tactics', true);
-    const noteKeys = ['記載方針', 'qualityScore定義', '進行の定義', 'RawLogsの色', '信頼下限'];
+    const noteKeys = ['記載方針', '進行の定義', '信頼下限'];
     $('#summaryNotes').innerHTML = noteKeys.filter(key => summary.has(key)).map(key => `<div class="note"><b>${escapeHtml(key)}</b><p>${escapeHtml(summary.get(key))}</p></div>`).join('');
     hydrateCardImages($('[data-view-panel="overview"]'));
     animateVisuals($('[data-view-panel="overview"]'));
@@ -494,42 +557,83 @@
     animateVisuals($('[data-view-panel="cards"]'));
   }
 
+  function sortedTacticGroups() {
+    return [...state.prepared.tacticGroups.entries()].sort((a,b) => sum(b[1].map(item => item.uses)) - sum(a[1].map(item => item.uses)) || a[0].localeCompare(b[0], 'ja'));
+  }
   function initializeTactics() {
-    const decks = [...state.prepared.tacticGroups.keys()];
-    $('#tacticDeckCount strong').textContent = formatInt(decks.length);
-    $('#tacticDeckOptions').innerHTML = decks.map(deck => `<option value="${escapeHtml(deck)}"></option>`).join('');
+    const groups = sortedTacticGroups();
+    $('#tacticDeckCount strong').textContent = formatInt(groups.length);
+    $('#tacticDeckOptions').innerHTML = groups.map(([deck]) => `<option value="${escapeHtml(deck)}"></option>`).join('');
+    renderTacticDeckChoices('');
     selectPopularTacticDeck(false);
   }
+  function renderTacticDeckChoices(query = '') {
+    const normalized = normalizeText(query);
+    const groups = sortedTacticGroups().filter(([deck]) => !normalized || normalizeText(deck).includes(normalized)).slice(0, 12);
+    $('#tacticDeckRail').innerHTML = groups.length ? groups.map(([deck, rows], index) => {
+      const { leaders, aces } = parseDeckLabel(deck);
+      const uses = sum(rows.map(item => item.uses));
+      const active = deck === state.selectedTacticDeck;
+      return `<button class="tactic-deck-choice ${active ? 'is-active' : ''}" type="button" data-tactic-deck="${encodeURIComponent(deck)}">
+        <span class="tactic-deck-choice__index">${String(index + 1).padStart(2, '0')}</span>
+        <span class="tactic-deck-choice__leaders">${Array.from({ length: 4 }, (_, i) => cardArtHTML(leaders[i] || '', 'leader', 'xs')).join('')}</span>
+        <span class="tactic-deck-choice__copy"><b>${escapeHtml(leaders.join(' / '))}</b><small>${escapeHtml(aces.join(' / ') || 'ACEなし')}</small></span>
+        <span class="tactic-deck-choice__uses"><strong>${formatInt(uses)}</strong><small>使用</small></span>
+      </button>`;
+    }).join('') : '<div class="empty-state"><strong>該当するデッキがない</strong>リーダー名かACE名を変えて検索して。</div>';
+    hydrateCardImages($('#tacticDeckRail'));
+  }
   function selectPopularTacticDeck(showNotice) {
-    const groups = [...state.prepared.tacticGroups.entries()].sort((a,b) => sum(b[1].map(item => item.uses)) - sum(a[1].map(item => item.uses)));
-    if (!groups.length) return;
-    state.selectedTacticDeck = groups[0][0];
-    $('#tacticDeckSearch').value = state.selectedTacticDeck;
-    renderTacticDeck();
+    const groups = sortedTacticGroups();
+    if (!groups.length) {
+      $('#selectedTacticDeck').innerHTML = '<div class="empty-state">戦術データを読み込めなかった。</div>';
+      $('#tacticSequenceList').innerHTML = '';
+      return;
+    }
+    selectTacticDeck(groups[0][0], true);
     if (showNotice) showToast('使用数が最も多いデッキを表示した。');
   }
   function selectTacticDeck(value, exact = false) {
     const normalized = normalizeText(value);
     if (!normalized) return;
     const decks = [...state.prepared.tacticGroups.keys()];
-    const matched = decks.find(deck => deck === value) || decks.find(deck => normalizeText(deck).includes(normalized));
-    if (!matched) return;
+    const matched = decks.find(deck => deck === value) || decks.find(deck => normalizeText(deck) === normalized) || decks.find(deck => normalizeText(deck).includes(normalized));
+    if (!matched) {
+      renderTacticDeckChoices(value);
+      return;
+    }
     state.selectedTacticDeck = matched;
     if (exact) $('#tacticDeckSearch').value = matched;
+    renderTacticDeckChoices('');
     renderTacticDeck();
+  }
+  function parseDeckLabel(deck) {
+    const parts = String(deck || '').split(/\s*＋\s*/);
+    return {
+      leaders: String(parts[0] || '').split(/\s*\/\s*/).filter(Boolean),
+      aces: String(parts.slice(1).join(' ＋ ') || '').split(/\s*\/\s*/).filter(Boolean)
+    };
   }
   function renderTacticDeck() {
     const deck = state.selectedTacticDeck;
     const rows = state.prepared.tacticGroups.get(deck) || [];
-    const [leaderText = '', aceText = ''] = deck.split(' ＋ ');
-    const leaders = leaderText.split(' / ').filter(Boolean);
-    const aces = aceText.split(' / ').filter(Boolean);
+    const { leaders, aces } = parseDeckLabel(deck);
     const totalUses = sum(rows.map(item => item.uses));
-    $('#selectedTacticDeck').innerHTML = `<div><div class="selected-deck__lineup">${leaders.map(name => cardChipHTML(name, 'leader')).join('')}${aces.map(name => cardChipHTML(name, 'ace', true)).join('')}</div><div class="selected-deck__title"><h3>${escapeHtml(leaderText)}</h3><p>${escapeHtml(aceText)}</p></div></div><div class="selected-deck__uses"><strong>${formatInt(totalUses)}</strong><span>タクティクス使用数</span></div>`;
+    const totalWins = sum(rows.map(item => item.wins));
+    const totalGames = sum(rows.map(item => item.games));
+    $('#selectedTacticDeck').innerHTML = `<div class="selected-deck__main">
+      <div class="selected-deck__leaders">${Array.from({ length: 4 }, (_, i) => lineupSlotHTML(leaders[i], 'leader')).join('')}</div>
+      <div class="selected-deck__aces"><span>ACE</span>${aces.length ? aces.map(name => cardChipHTML(name, 'ace', true)).join('') : '<b>記録なし</b>'}</div>
+    </div>
+    <div class="selected-deck__summary"><div><span>並び数</span><strong>${formatInt(rows.length)}</strong></div><div><span>使用数</span><strong>${formatInt(totalUses)}</strong></div><div><span>合計勝率</span><strong>${percent(totalGames ? totalWins / totalGames : 0, 1)}</strong></div></div>`;
     $('#tacticSequenceList').innerHTML = rows.length ? rows.map((item, i) => {
-      const steps = item.order.split(' → ').filter(Boolean);
-      return `<article class="sequence-card"><div class="sequence-flow">${steps.map((step, j) => `${j ? '<span class="sequence-arrow">→</span>' : ''}<span class="sequence-step">${cardArtHTML(step, 'tactics', 'xs')}<span>${escapeHtml(step)}</span></span>`).join('')}</div><div class="sequence-metrics"><div class="sequence-metric"><span>使用数</span><strong>${formatInt(item.uses)}</strong></div><div class="sequence-metric"><span>使用率</span><strong>${percent(item.useRate, 1)}</strong></div><div class="sequence-metric sequence-metric--accent"><span>勝率</span><strong>${percent(item.winRate, 1)}</strong></div></div></article>`;
-    }).join('') : '<div class="empty-state">このデッキのタクティクスデータがない。</div>';
+      const steps = item.order.split(/\s*→\s*/).filter(Boolean);
+      return `<article class="sequence-card">
+        <span class="sequence-rank">${String(i + 1).padStart(2, '0')}</span>
+        <div class="sequence-flow">${steps.map((step, j) => `${j ? '<span class="sequence-arrow" aria-hidden="true">→</span>' : ''}<span class="sequence-step">${cardArtHTML(step, 'tactics', 'xs')}<b>${escapeHtml(step)}</b><small>${j + 1}</small></span>`).join('')}</div>
+        <div class="sequence-metrics"><div class="sequence-metric"><span>使用</span><strong>${formatInt(item.uses)}</strong></div><div class="sequence-metric"><span>使用率</span><strong>${percent(item.useRate, 1)}</strong></div><div class="sequence-metric sequence-metric--accent"><span>勝率</span><strong>${percent(item.winRate, 1)}</strong><small>${formatInt(item.wins)}勝 / ${formatInt(item.games)}試合</small></div></div>
+      </article>`;
+    }).join('') : '<div class="empty-state"><strong>このデッキの戦術データがない</strong>別のデッキを選択して。</div>';
     hydrateCardImages($('[data-view-panel="tactics"]'));
     animateVisuals($('[data-view-panel="tactics"]'));
   }
@@ -553,72 +657,68 @@
     hydrateCardImages($('#logList'));
     animateVisuals($('[data-view-panel="logs"]'));
   }
-  function logCardHTML(log, open) {
-    const selfLeaders = [1,2,3,4].map(i => log[`自分リーダー${i}`]).filter(Boolean);
-    const opponentLeaders = [1,2,3,4].map(i => log[`相手リーダー${i}`]).filter(Boolean);
-    const selfAces = [log['自分ACE1'], log['自分ACE2']].filter(Boolean);
-    const selfTactics = [1,2,3].map(i => log[`自分戦術${i}`]).filter(Boolean);
-    const opponentTactics = [1,2,3].map(i => log[`相手戦術${i}`]).filter(Boolean);
+  function logCardHTML(log) {
+    const selfLeaders = [1,2,3,4].map(i => String(log[`自分リーダー${i}`] || '').trim());
+    const opponentLeaders = [1,2,3,4].map(i => String(log[`相手リーダー${i}`] || '').trim());
+    const selfAces = Array.from({ length: 8 }, (_, i) => String(log[`自分ACE${i + 1}`] || '').trim()).filter(Boolean);
+    const opponentAces = Array.from({ length: 8 }, (_, i) => String(log[`相手ACE${i + 1}`] || '').trim()).filter(Boolean);
+    const selfTactics = [1,2,3].map(i => String(log[`自分戦術${i}`] || '').trim()).filter(Boolean);
+    const opponentTactics = [1,2,3].map(i => String(log[`相手戦術${i}`] || '').trim()).filter(Boolean);
     const win = log['結果'] === '勝';
     const resultText = win ? 'WIN' : 'LOSE';
     const matchNumber = log['対戦番号'] || '—';
-
-    return `<details class="log-card ${win ? 'is-win' : 'is-lose'}" ${open ? 'open' : ''}>
-      <summary class="log-card__summary">
-        <div class="log-card__event">
-          <div class="log-card__event-meta"><time>${escapeHtml(formatExcelDate(log['大会日付']))}</time><span>ROUND ${escapeHtml(matchNumber)}</span></div>
+    return `<article class="match-record ${win ? 'is-win' : 'is-lose'}">
+      <header class="match-record__head">
+        <div class="match-event">
+          <div class="match-event__meta"><time>${escapeHtml(formatExcelDate(log['大会日付']))}</time><span>MATCH ${escapeHtml(matchNumber)}</span></div>
           <h3>${escapeHtml(log['大会名'] || '大会名なし')}</h3>
           <p>${escapeHtml(log['ユーザー名'] || '—')}</p>
         </div>
-
-        <div class="log-matchup" aria-label="対戦構成">
-          <div class="log-team log-team--self">
-            <span class="log-team__label">YOUR LEADERS</span>
-            <div class="log-team__leaders" data-card-count="${selfLeaders.length}">${selfLeaders.map(name => lineupCardHTML(name, 'leader', true)).join('')}</div>
-            <div class="log-team__aces">${selfAces.length ? `<span>ACE</span>${selfAces.map(name => cardChipHTML(name, 'ace', true)).join('')}` : '<span>ACE —</span>'}</div>
-          </div>
-          <span class="log-matchup__vs">VS</span>
-          <div class="log-team log-team--opponent">
-            <span class="log-team__label">OPPONENT LEADERS</span>
-            <div class="log-team__leaders" data-card-count="${opponentLeaders.length}">${opponentLeaders.map(name => lineupCardHTML(name, 'leader', true)).join('')}</div>
-          </div>
-        </div>
-
-        <div class="log-card__result">
+        <div class="match-status">
           <span class="result-badge ${win ? 'result-badge--win' : 'result-badge--lose'}">${resultText}</span>
-          <div class="log-result-meta"><span>${escapeHtml(log['先後'] || '—')}</span><strong>${escapeHtml(log['進行'] || '—')}</strong></div>
-          <span class="log-card__toggle"><b>詳細</b><i aria-hidden="true">⌄</i></span>
+          <span class="match-tag">${escapeHtml(log['先後'] || '—')}</span>
+          <span class="match-tag match-tag--strong">${escapeHtml(log['進行'] || '—')}</span>
         </div>
-      </summary>
-
-      <div class="log-card__details">
-        <div class="log-detail-meta">
-          <span><b>大会</b>${escapeHtml(log['大会名'] || '—')}</span>
-          <span><b>ユーザー</b>${escapeHtml(log['ユーザー名'] || '—')}</span>
-          <span><b>先後</b>${escapeHtml(log['先後'] || '—')}</span>
-          <span><b>進行</b>${escapeHtml(log['進行'] || '—')}</span>
-        </div>
-        <div class="log-versus">
-          <section class="log-side log-side--self">
-            <div class="log-side__label"><span>自分の構成</span><strong>${resultText}</strong></div>
-            <div class="log-side__cards">${selfLeaders.map(name => cardChipHTML(name, 'leader')).join('')}${selfAces.map(name => cardChipHTML(name, 'ace', true)).join('')}</div>
-            ${tacticsRouteHTML(selfTactics, '自分のタクティクス')}
-          </section>
-          <div class="log-vs">VS</div>
-          <section class="log-side log-side--opponent">
-            <div class="log-side__label"><span>相手の構成</span><strong>OPPONENT</strong></div>
-            <div class="log-side__cards">${opponentLeaders.map(name => cardChipHTML(name, 'leader')).join('')}</div>
-            ${tacticsRouteHTML(opponentTactics, '相手のタクティクス')}
-          </section>
-        </div>
-        ${log['メモ'] ? `<div class="log-note"><b>MEMO</b><p>${escapeHtml(log['メモ'])}</p></div>` : ''}
+      </header>
+      ${roundTrackHTML(log)}
+      <div class="match-board">
+        ${matchSideHTML('YOUR DECK', '自分', selfLeaders, selfAces, 'self')}
+        <div class="match-vs" aria-hidden="true"><span>VS</span></div>
+        ${matchSideHTML('OPPONENT', '相手', opponentLeaders, opponentAces, 'opponent')}
       </div>
-    </details>`;
+      <details class="match-more">
+        <summary><span>戦術・メモ</span><i>表示</i></summary>
+        <div class="match-more__body">
+          <div class="match-tactics-grid">
+            ${matchTacticsHTML('自分のタクティクス', selfTactics)}
+            ${matchTacticsHTML('相手のタクティクス', opponentTactics)}
+          </div>
+          ${log['メモ'] ? `<div class="match-note"><b>MEMO</b><p>${escapeHtml(log['メモ'])}</p></div>` : ''}
+        </div>
+      </details>
+    </article>`;
   }
-
-  function tacticsRouteHTML(tactics, label) {
-    if (!tactics.length) return `<div class="log-side__tactics"><b>${escapeHtml(label)}</b><span class="log-tactic-empty">記録なし</span></div>`;
-    return `<div class="log-side__tactics"><b>${escapeHtml(label)}</b><div class="log-tactic-route">${tactics.map((name, index) => `<span class="log-tactic"><i>${index + 1}</i>${escapeHtml(name)}</span>`).join('<span class="log-tactic-arrow">→</span>')}</div></div>`;
+  function matchSideHTML(eyebrow, label, leaders, aces, side) {
+    return `<section class="match-side match-side--${side}">
+      <div class="match-side__head"><span>${escapeHtml(eyebrow)}</span><b>${escapeHtml(label)}</b></div>
+      <div class="match-leaders">${Array.from({ length: 4 }, (_, i) => lineupSlotHTML(leaders[i], 'leader', true)).join('')}</div>
+      <div class="match-aces"><span>ACE</span><div>${aces.length ? aces.map(name => cardChipHTML(name, 'ace', true)).join('') : '<b class="match-empty">記録なし</b>'}</div></div>
+    </section>`;
+  }
+  function roundTrackHTML(log) {
+    const rounds = [1,2,3].map(i => ({ label: `${i}R`, value: String(log[`${i}R`] || '—') }));
+    return `<div class="match-rounds"><span>ROUND RESULT</span><div>${rounds.map(round => {
+      const stateClass = round.value === '勝' ? 'is-win' : round.value === '負' ? 'is-lose' : 'is-none';
+      const text = round.value === '勝' ? 'WIN' : round.value === '負' ? 'LOSE' : '—';
+      return `<span class="round-pill ${stateClass}"><b>${round.label}</b><i>${text}</i></span>`;
+    }).join('')}</div></div>`;
+  }
+  function matchTacticsHTML(label, tactics) {
+    return `<section class="match-tactics"><b>${escapeHtml(label)}</b>${tactics.length ? `<div>${tactics.map((name, index) => `<span class="match-tactic"><i>${index + 1}</i><b>${escapeHtml(name)}</b></span>`).join('<span class="match-tactic-arrow">→</span>')}</div>` : '<span class="match-empty">記録なし</span>'}</section>`;
+  }
+  function lineupSlotHTML(name, role, compact = false) {
+    const safeName = String(name || '').trim();
+    return `<span class="lineup-card ${compact ? 'lineup-card--compact' : ''} ${safeName ? '' : 'is-empty'}">${cardArtHTML(safeName, role, 'sm')}<b>${escapeHtml(safeName || '—')}</b></span>`;
   }
 
   function lineupCardHTML(name, role, compact = false) {

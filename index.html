@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#111216">
+  <meta name="theme-color" content="#f4f5f8">
   <meta name="color-scheme" content="light">
   <meta name="description" content="Xross Stars 対戦統計ダッシュボード">
   <title>Xross Stats</title>
@@ -27,7 +27,7 @@
     <div class="auth__panel">
       <div class="brand-lockup">
         <span class="x-mark"><i></i><i></i></span>
-        <span><strong>XROSS STATS</strong><small>MATCH DATA PORTAL</small></span>
+        <span><strong>XROSS STATS</strong><small>COMPETITIVE DATA</small></span>
       </div>
       <p class="kicker">PRIVATE ACCESS</p>
       <h1 id="authTitle">対戦統計</h1>
@@ -58,7 +58,7 @@
       </button>
       <button class="brand-lockup brand-lockup--button" type="button" data-view="overview" aria-label="概要へ移動">
         <span class="x-mark"><i></i><i></i></span>
-        <span><strong>XROSS STATS</strong><small>MATCH DATA PORTAL</small></span>
+        <span><strong>XROSS STATS</strong><small>COMPETITIVE DATA</small></span>
       </button>
       <nav class="desktop-nav" aria-label="メインメニュー">
         <button class="nav__item is-active" type="button" data-view="overview"><span>01</span><b>概要</b></button>
@@ -90,11 +90,19 @@
     </aside>
     <button id="sidebarScrim" class="sidebar-scrim" type="button" aria-label="メニューを閉じる"></button>
 
+    <nav class="mobile-nav" aria-label="モバイルメニュー">
+      <button class="is-active" type="button" data-view="overview"><span>01</span><b>概要</b></button>
+      <button type="button" data-view="decks"><span>02</span><b>デッキ</b></button>
+      <button type="button" data-view="cards"><span>03</span><b>カード</b></button>
+      <button type="button" data-view="tactics"><span>04</span><b>戦術</b></button>
+      <button type="button" data-view="logs"><span>05</span><b>ログ</b></button>
+    </nav>
+
     <main id="mainContent" class="main">
       <section class="view is-active" data-view-panel="overview">
         <div class="hero motion-item">
           <div class="hero__copy">
-            <p class="kicker">META OVERVIEW</p>
+            <p class="kicker">OVERVIEW</p>
             <h2>対戦統計</h2>
             <p id="overviewLead" class="hero__lead"></p>
           </div>
@@ -159,35 +167,32 @@
       </section>
 
       <section class="view" data-view-panel="tactics">
-        <div class="page-head motion-item"><div><p class="kicker">TACTICS ORDER</p><h2>戦術構成</h2><p>デッキ別の選択順・結果</p></div><div id="tacticDeckCount" class="count-badge"><span>DECKS</span><strong>—</strong></div></div>
+        <div class="page-head motion-item"><div><p class="kicker">TACTICS</p><h2>戦術構成</h2><p>デッキごとの選択順と勝率</p></div><div id="tacticDeckCount" class="count-badge"><span>DECKS</span><strong>—</strong></div></div>
         <div class="control-bar motion-item">
           <label class="search-control search-control--wide"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="tacticDeckSearch" list="tacticDeckOptions" placeholder="リーダー・ACEからデッキを検索"><datalist id="tacticDeckOptions"></datalist></label>
           <button id="popularTacticDeck" class="button button--ghost" type="button">最多使用デッキ</button>
         </div>
+        <div id="tacticDeckRail" class="tactic-deck-rail motion-item" aria-label="デッキ候補"></div>
         <article id="selectedTacticDeck" class="selected-deck motion-item"></article>
         <div id="tacticSequenceList" class="sequence-list motion-group"></div>
       </section>
 
       <section class="view" data-view-panel="logs">
-        <div class="page-head motion-item"><div><p class="kicker">MATCH RECORDS</p><h2>対戦ログ</h2><p>大会・ユーザー・構成・メモ</p></div><div id="logCountBadge" class="count-badge"><span>RESULT</span><strong>—</strong></div></div>
-        <div class="control-bar motion-item">
+        <div class="page-head motion-item"><div><p class="kicker">MATCH LOG</p><h2>対戦ログ</h2><p>構成とラウンド結果を試合ごとに比較</p></div><div id="logCountBadge" class="count-badge"><span>RESULT</span><strong>—</strong></div></div>
+        <div class="control-bar log-filter-bar motion-item">
           <label class="search-control search-control--wide"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="logSearch" type="search" placeholder="大会・ユーザー・カード・メモを検索"></label>
-          <label class="select-control"><span>先後</span><select id="logTurn"><option value="">すべて</option><option>先攻</option><option>後攻</option></select></label>
-          <label class="select-control"><span>結果</span><select id="logResult"><option value="">すべて</option><option value="勝">勝ち</option><option value="負">負け</option></select></label>
-          <label class="select-control"><span>進行</span><select id="logLead"><option value="">すべて</option><option>勝ち進行</option><option>負け進行</option></select></label>
+          <button id="logFilterToggle" class="log-filter-toggle" type="button" aria-expanded="false" aria-controls="logAdvancedFilters"><span>絞り込み</span><i aria-hidden="true"></i></button>
+          <div id="logAdvancedFilters" class="log-advanced-filters">
+            <label class="select-control"><span>先後</span><select id="logTurn"><option value="">すべて</option><option>先攻</option><option>後攻</option></select></label>
+            <label class="select-control"><span>結果</span><select id="logResult"><option value="">すべて</option><option value="勝">勝ち</option><option value="負">負け</option></select></label>
+            <label class="select-control"><span>進行</span><select id="logLead"><option value="">すべて</option><option>勝ち進行</option><option>負け進行</option></select></label>
+            <button id="clearLogFilters" class="button button--ghost" type="button">条件をクリア</button>
+          </div>
         </div>
         <div id="logList" class="log-list motion-group"></div>
         <div id="logPagination" class="pagination"></div>
       </section>
     </main>
-
-    <nav class="mobile-nav" aria-label="モバイルメニュー">
-      <button class="is-active" type="button" data-view="overview"><span>01</span><b>概要</b></button>
-      <button type="button" data-view="decks"><span>02</span><b>デッキ</b></button>
-      <button type="button" data-view="cards"><span>03</span><b>カード</b></button>
-      <button type="button" data-view="tactics"><span>04</span><b>戦術</b></button>
-      <button type="button" data-view="logs"><span>05</span><b>ログ</b></button>
-    </nav>
   </div>
 
   <div id="routeTransition" class="route-transition" aria-hidden="true">
