@@ -724,10 +724,16 @@
           <div class="deck-lineup__aces"><span class="deck-lineup__label">ACE</span>${deck.aces.map(name => cardChipHTML(name, 'ace', true)).join('')}</div>
         </div>
         <div class="deck-metrics">
-          <div class="deck-metric"><span>試合</span><strong>${formatInt(deck.games)}</strong></div>
-          <div class="deck-metric"><span>勝数</span><strong>${formatInt(deck.wins)}</strong></div>
-          <div class="deck-metric deck-metric--accent"><span>勝率</span><strong>${percent(deck.winRate, 1)}</strong></div>
-          <div class="deck-metric"><span>信頼下限</span><strong>${percent(deck.confidence, 1)}</strong></div>
+          <div class="deck-headline">
+            <span>勝率</span>
+            <strong>${percent(deck.winRate, 1)}</strong>
+            ${winBarHTML(deck.winRate)}
+          </div>
+          <div class="deck-subs">
+            <div><span>試合</span><b>${formatInt(deck.games)}</b></div>
+            <div><span>勝数</span><b>${formatInt(deck.wins)}</b></div>
+            <div><span>信頼下限</span><b>${percent(deck.confidence, 1)}</b></div>
+          </div>
         </div>
         <div class="deck-actions">
           <button class="${selected ? 'is-active' : ''}" type="button" data-deck-action="compare" data-deck-id="${deck.uid}">${selected ? '比較から外す' : '比較に追加'}</button>
