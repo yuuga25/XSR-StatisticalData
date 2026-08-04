@@ -567,19 +567,24 @@
         <strong class="kpi-card__value" data-counter="${item.value}">0<small>${escapeHtml(item.unit)}</small></strong>
         <span class="kpi-card__sub">${escapeHtml(item.sub)}</span>
       </article>`).join('');
-    $('#insightStrip').innerHTML = `<div><span>FIRST / SECOND GAP</span><strong>${delta >= 0 ? '+' : ''}${(delta * 100).toFixed(1)}<small>pt</small></strong></div><p><b>先攻 ${percent(firstRate, 1)}</b><i></i><b>後攻 ${percent(second['勝率'], 1)}</b></p>`;
-    $('#turnOrderChart').innerHTML = firstSecond.map((row, index) => `
+    $('#insightStrip').innerHTML = `
+      <div class="insight-cell"><span>先攻 勝率</span><strong>${percent(firstRate, 1)}</strong><small>${formatInt(first['試合数'])}試合</small></div>
+      <div class="insight-cell insight-cell--gap"><span>先後差</span><strong>${delta >= 0 ? '+' : '−'}${Math.abs(delta * 100).toFixed(1)}<i>pt</i></strong><small>${delta >= 0 ? '先攻有利' : '後攻有利'}</small></div>
+      <div class="insight-cell"><span>後攻 勝率</span><strong>${percent(second['勝率'], 1)}</strong><small>${formatInt(second['試合数'])}試合</small></div>`;
+    $('#turnOrderChart').innerHTML = firstSecond.map(row => `
       <div class="turn-row">
         <div class="turn-row__label"><strong>${escapeHtml(row['先後'])}</strong><small>${formatInt(row['試合数'])}試合</small></div>
-        <div class="rate-bar"><i data-bar="${Math.max(number(row['勝率']) * 100, 1)}%" style="--bar-gradient:${index === 0 ? 'linear-gradient(90deg,var(--cyan),var(--violet))' : 'linear-gradient(90deg,#7b86a9,var(--magenta))'}"></i></div>
+        ${winBarHTML(row['勝率'])}
         <div class="turn-row__rate">${percent(row['勝率'], 1)}</div>
-      </div>`).join('') + `<div class="turn-delta"><span>先後差</span><strong>${delta >= 0 ? '+' : ''}${(delta * 100).toFixed(1)} pt</strong></div>`;
+      </div>`).join('')
+      + `<div class="turn-delta"><span>先後差</span><strong>${delta >= 0 ? '+' : '−'}${Math.abs(delta * 100).toFixed(1)} pt</strong></div>`
+      + `<p class="chart-note">バーは勝率50%を中心に、右へ伸びるほど有利。</p>`;
     const leadTotal = leadStats.filter(row => row['先後'] === '合計');
-    $('#leadFlowChart').innerHTML = leadTotal.map((row, i) => `
-      <div class="flow-card" style="--flow-color:${i === 0 ? 'var(--violet)' : 'var(--magenta)'}">
+    $('#leadFlowChart').innerHTML = leadTotal.map(row => `
+      <div class="flow-card">
         <div class="flow-card__head"><h4>${escapeHtml(row['進行'])}</h4><strong>${percent(row['勝率'], 1)}</strong></div>
         <div class="flow-card__meta"><span>${formatInt(row['勝数'])}勝 / ${formatInt(row['試合数'])}試合</span><span>構成比 ${percent(row['構成比'], 1)}</span></div>
-        <div class="rate-bar"><i data-bar="${Math.max(number(row['勝率']) * 100, 1)}%" style="--bar-gradient:linear-gradient(90deg,${i === 0 ? 'var(--cyan),var(--violet)' : '#f28aa0,var(--magenta)'})"></i></div>
+        ${winBarHTML(row['勝率'])}
       </div>`).join('');
     $('#overviewDecks').innerHTML = decks.all.slice(0, 6).map(deck => `
       <button class="top-deck" type="button" data-overview-deck="${deck.uid}">
@@ -605,22 +610,16 @@
     if (!container) return;
     if (!rows.length) return void (container.innerHTML = '<div class="empty-state">ラウンド別データがない。</div>');
     const pick = (round, side) => rows.find(row => row['ラウンド'] === round && row['先後'] === side) || {};
-    const palettes = [
-      { accent: 'var(--cyan)', gradient: 'linear-gradient(90deg,var(--cyan),var(--holo-a))' },
-      { accent: 'var(--violet)', gradient: 'linear-gradient(90deg,var(--violet),var(--holo-b))' },
-      { accent: 'var(--magenta)', gradient: 'linear-gradient(90deg,var(--magenta),var(--holo-c))' }
-    ];
-    container.innerHTML = ['1R', '2R', '3R'].map((round, index) => {
+    container.innerHTML = ['1R', '2R', '3R'].map(round => {
       const total = pick(round, '合計');
       const first = pick(round, '先攻');
       const second = pick(round, '後攻');
-      const rate = number(total['勝率']);
-      return `<div class="round-row" style="--round-color:${palettes[index].accent}">
+      return `<div class="round-row">
         <div class="round-row__head">
           <div><strong>${round}</strong><small>${formatInt(total['試合数'])}試合</small></div>
-          <span class="round-row__rate">${percent(rate, 1)}</span>
+          <span class="round-row__rate">${percent(total['勝率'], 1)}</span>
         </div>
-        <div class="rate-bar"><i data-bar="${Math.max(rate * 100, 1)}%" style="--bar-gradient:${palettes[index].gradient}"></i></div>
+        ${winBarHTML(total['勝率'])}
         <div class="round-row__split"><span>先攻 <b>${percent(first['勝率'], 1)}</b></span><span>後攻 <b>${percent(second['勝率'], 1)}</b></span></div>
       </div>`;
     }).join('') + `<p class="round-chart__note">3Rは1R/2Rが同結果で決着した試合を母数から除いている。</p>`;
@@ -670,6 +669,19 @@
         <span class="trend-legend__bar">試合数</span><span class="trend-legend__line">勝率</span>
         <span class="trend-legend__total">${formatInt(rows.length)}日 / ${formatInt(totalGames)}試合 / 通算 ${percent(totalGames ? totalWins / totalGames : 0, 1)}</span>
       </div>`;
+  }
+
+  /**
+   * 勝率バー。50%を中心に、右へ伸びれば有利・左へ伸びれば不利。
+   * 0起点のバーだと 61.9% と 51.9% の差が見た目でほとんど出ないため、
+   * 勝率を扱うバーはすべてこれに統一する（採用率などの構成比は0起点のまま）。
+   */
+  function winBarHTML(rate) {
+    const value = Math.min(Math.max(number(rate), 0), 1);
+    const tone = value >= .55 ? 'is-good' : value <= .45 ? 'is-bad' : 'is-even';
+    return `<div class="mu-bar ${tone}">
+      <i data-bar="${Math.max(Math.abs(value - .5) * 100, .8)}%" style="left:${(Math.min(value, .5) * 100).toFixed(2)}%"></i>
+    </div>`;
   }
 
   function spotlightHTML(items, role, isUsage) {
@@ -1004,7 +1016,7 @@
     return `<div class="matchup-row ${tone}">
       ${cardArtHTML(item.opponent, 'leader', 'xs')}
       <div class="matchup-row__name"><b>${escapeHtml(item.opponent)}</b><small>${formatInt(item.wins)}勝 / ${formatInt(item.games)}試合</small></div>
-      <div class="mu-bar"><i data-bar="${Math.max(Math.abs(rate - .5) * 100, .8)}%" style="left:${(Math.min(rate, .5) * 100).toFixed(2)}%"></i></div>
+      ${winBarHTML(rate)}
       <div class="matchup-row__rate"><b>${percent(rate, 1)}</b><small>下限 ${percent(item.confidence, 1)}</small></div>
     </div>`;
   }
@@ -1038,7 +1050,7 @@
             <div><span>信頼下限</span><strong>${percent(item.confidence, 1)}</strong></div>
             <div><span>試合数</span><strong>${formatInt(item.games)}</strong></div>
           </div>
-          <div class="rate-bar"><i data-bar="${Math.max(number(item.confidence) * 100, 1)}%" style="--bar-gradient:linear-gradient(90deg,var(--violet),var(--holo-c))"></i></div>
+          ${winBarHTML(item.confidence)}
         </div>
       </article>`).join('')
       : '<div class="empty-state"><strong>条件に合う組み合わせがない</strong>最低試合数か検索語を変えて。</div>';

@@ -2307,3 +2307,251 @@ html, body { overflow-x: clip; }
 @media (max-width: 760px) {
   .trend-chart svg { height: 168px; }
 }
+
+/* ==========================================================================
+   DESIGN PASS
+   骨格（レイアウト・ナビ）はそのまま、装飾を削いで「読む計器」にする。
+   空いた視覚的な主役はカード絵に渡す。以降のルールが最終的な見た目。
+   ========================================================================== */
+
+/* --- 1. 装飾の撤去 ---------------------------------------------------------
+   淡いグラデ玉・✦・ぼかしは意味を持たないまま視線を奪い、
+   白地の上の数字のコントラストも下げていたので全て落とす。 */
+.panel::before,
+.panel::after,
+.kpi-card::after,
+.flow-card::after,
+.hero::after,
+.auth__panel::after,
+.deck-card::after,
+.insight-strip::after { content: none !important; display: none !important; }
+
+.backdrop {
+  background: linear-gradient(180deg, #fbfbfc 0%, #f4f5f7 58%, #f8f8fa 100%);
+}
+.backdrop::after { opacity: .14; }
+.backdrop__mesh { opacity: .3; }
+.backdrop__flare { display: none; }
+.backdrop__slashes { opacity: .05; }
+
+/* --- 2. 面: 単色の白とヘアライン ------------------------------------------ */
+.panel,
+.deck-card,
+.card-stat,
+.synergy-card,
+.control-bar,
+.compare-tray,
+.tactic-deck-choice,
+.sequence-card,
+.match-record {
+  border-color: rgba(17, 18, 22, .10);
+  background: #fff;
+  backdrop-filter: none;
+  box-shadow: 0 1px 2px rgba(17, 18, 22, .05);
+}
+.panel, .card-stat, .synergy-card, .deck-card { border-radius: 16px; }
+.control-bar, .compare-tray { border-radius: 14px; }
+.deck-card:hover { border-color: rgba(17, 18, 22, .2); box-shadow: 0 6px 20px rgba(17, 18, 22, .08); }
+.deck-card.is-selected { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(17, 18, 22, .06); }
+
+/* --- 3. 文字 --------------------------------------------------------------
+   日本語見出しの詰めすぎを解除し、数値は全て等幅にして桁を揃える。 */
+.page-head h2, .hero h2 { letter-spacing: -.012em; }
+.panel__head h3 { letter-spacing: -.004em; }
+.kpi-card__value,
+.count-badge strong,
+.turn-row__rate,
+.flow-card__head strong,
+.round-row__rate,
+.deck-metric strong,
+.top-deck__metrics strong,
+.card-stat__headline strong,
+.card-stat__minor strong,
+.matchup-summary__metrics strong,
+.synergy-card__metrics strong,
+.spotlight__metric strong,
+.insight-cell strong,
+.matchup-row__rate b { font-variant-numeric: tabular-nums; }
+
+/* --- 4. 勝率バー ----------------------------------------------------------
+   勝率は 50% を中心に発散させる。0起点だと 61.9% と 51.9% の差が
+   見た目にほとんど出ず、比較の道具として成立しないため。
+   構成比・採用率のような「全体に対する割合」は0起点のまま。 */
+.mu-bar { height: 12px; background: rgba(17, 18, 22, .07); }
+.mu-bar::before { background: rgba(17, 18, 22, .3); }
+.mu-bar i { background: #9aa0ab; }
+.mu-bar.is-good i { background: var(--win); }
+.mu-bar.is-bad i { background: var(--lose); }
+.matchup-row.is-good .matchup-row__rate b { color: var(--win); }
+.matchup-row.is-bad .matchup-row__rate b { color: var(--lose); }
+.rate-bar i { box-shadow: none; background: var(--bar-gradient, #33363f); }
+
+.turn-row { grid-template-columns: 78px minmax(0, 1fr) 78px; }
+.turn-row .mu-bar, .flow-card .mu-bar, .round-row .mu-bar { margin: 0; }
+.flow-card .mu-bar { margin-top: 4px; }
+.chart-note { margin: 14px 0 0; color: var(--muted-2); font-size: .68rem; line-height: 1.6; }
+.turn-delta { border-radius: 12px; background: #f5f6f8; }
+
+/* --- 5. 先後差の帯（旧: 白文字が淡い背景に埋もれて読めなかった箇所） ------ */
+.insight-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 14px 0 18px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(17, 18, 22, .10);
+  border-radius: 16px;
+  color: var(--ink);
+  background: rgba(17, 18, 22, .10);
+}
+.insight-cell { display: grid; align-content: center; gap: 3px; padding: 15px 20px; background: #fff; }
+.insight-cell span { color: var(--muted); font-size: .66rem; font-weight: 820; letter-spacing: .05em; }
+.insight-cell strong { font-size: 1.62rem; font-weight: 900; letter-spacing: -.03em; line-height: 1.1; }
+.insight-cell strong i { margin-left: 3px; color: var(--muted); font-size: .78rem; font-style: normal; font-weight: 800; }
+.insight-cell small { color: var(--muted-2); font-size: .68rem; }
+.insight-cell--gap { background: #fafbfd; }
+
+/* --- 6. カード絵を主役に ---------------------------------------------------
+   装飾を落とした分、紙面で色を持つのはカード絵だけになる。
+   一回り大きくし、白地から浮くように影と縁を締める。 */
+.card-art {
+  border-radius: 10px;
+  border-color: rgba(17, 18, 22, .14);
+  box-shadow: 0 6px 18px rgba(17, 22, 40, .13), 0 1px 2px rgba(17, 22, 40, .1);
+}
+.card-art--xs { width: 42px; }
+.card-art--sm { width: 104px; }
+.card-art--lg { width: 152px; }
+
+.card-stat { grid-template-columns: auto 152px minmax(0, 1fr); gap: 20px; padding: 18px; }
+.card-stat > .card-art { width: 152px; }
+.card-stat__rank { font-size: 1.25rem; }
+
+.spotlight { grid-template-columns: 140px minmax(0, 1fr); gap: 18px; padding: 0 22px 18px; }
+.spotlight__art .card-art { width: 140px; }
+.spotlight__others { padding: 0 22px 20px; }
+
+.matchup-chip { width: 126px; }
+.matchup-chip .card-art { width: 82px; }
+.synergy-card__pair .card-art { width: 78px; }
+.matchup-row { grid-template-columns: 42px minmax(120px, .9fr) minmax(0, 1.6fr) 96px; }
+.matchup-row .card-art { width: 42px; }
+
+/* --- 7. 密度 ---------------------------------------------------------------
+   1画面に入る行数を増やす。統計は並べて比べられて初めて意味がある。 */
+.panel__head { padding: 20px 22px 13px; }
+.turn-chart, .flow-chart, .round-chart, .trend-chart { padding: 4px 22px 22px; }
+.top-decks { padding: 0 22px 18px; }
+.notes-grid { margin: 0 22px 22px; }
+.matchup-rail { padding: 2px 22px 22px; }
+.matchup-summary, .matchup-list { padding-inline: 22px; }
+.panel__note { padding: 12px 22px 20px; }
+.deck-card { gap: 18px; padding: 18px; }
+.deck-list { gap: 12px; }
+.card-stats-grid { gap: 12px; }
+.turn-row { padding: 14px 0; }
+.round-chart { gap: 14px; }
+
+/* --- 8. デッキ指標: 反転した黒ブロックをやめ、大きさで序列をつける -------- */
+.deck-metric { padding: 12px 14px; border-radius: 12px; background: #f5f6f8; }
+.deck-metric strong { font-size: 1.16rem; }
+.deck-metric--accent {
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid rgba(17, 18, 22, .14);
+  box-shadow: none;
+}
+.deck-metric--accent span { color: var(--muted); }
+.deck-metric--accent strong { color: var(--ink); font-size: 1.5rem; }
+
+/* --- 9. KPI ---------------------------------------------------------------- */
+.kpi-card { background: #fff; }
+.kpi-card__value { letter-spacing: -.055em; }
+
+/* --- 10. ヒーロー: 情報量に見合う高さへ、装飾は落とす -------------------- */
+.hero { min-height: 216px; }
+.hero h2 { font-size: clamp(2rem, 3.2vw, 3rem); }
+
+@media (max-width: 760px) {
+  .insight-strip { grid-template-columns: 1fr; }
+  .card-stat { grid-template-columns: auto 116px minmax(0, 1fr); gap: 14px; }
+  .card-stat > .card-art { width: 116px; }
+  .spotlight { grid-template-columns: 116px minmax(0, 1fr); }
+  .spotlight__art .card-art { width: 116px; }
+  .panel__head { padding: 17px 16px 12px; }
+  .turn-chart, .flow-chart, .round-chart, .trend-chart { padding: 4px 16px 18px; }
+  .top-decks, .matchup-rail { padding-inline: 16px; }
+  .notes-grid { margin-inline: 16px; }
+}
+
+/* --- 11. 残った装飾色の整理 ------------------------------------------------
+   KPIの色付きの線・勝率バーのグラデーション・推移グラフのマゼンタは、
+   どれも意味を持たない色だった。色は勝敗と選択状態にだけ使う。 */
+.kpi-card::before { background: rgba(17, 18, 22, .28); box-shadow: none; }
+
+/* 勝率バーは単色。矩形の長さだけで比較できるようにする。 */
+.matchup-row.is-good .mu-bar i,
+.mu-bar.is-good i { background: var(--win); }
+.matchup-row.is-bad .mu-bar i,
+.mu-bar.is-bad i { background: var(--lose); }
+.mu-bar.is-even i { background: #6f7684; }
+
+/* 推移グラフ: 系列は主線＝濃いインク、棒＝薄いグレーの2階調に絞る。 */
+.trend-line { stroke: #22242b; stroke-width: 2.2; }
+.trend-bar { fill: rgba(17, 18, 22, .13); }
+.trend-bar:hover { fill: rgba(17, 18, 22, .3); }
+.trend-legend__line::before { background: #22242b; }
+.trend-legend__bar::before { background: rgba(17, 18, 22, .22); }
+
+/* --- 12. 先後差の帯: 値を主役に、ラベルは添える ---------------------------- */
+.insight-strip > .insight-cell {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 14px 20px;
+}
+.insight-strip > .insight-cell span { flex: none; font-size: .68rem; }
+.insight-strip > .insight-cell strong { font-size: 1.5rem; }
+.insight-strip > .insight-cell small { color: var(--muted-2); font-size: .68rem; }
+.insight-cell--gap strong { color: var(--blue); }
+
+/* --- 13. カード絵の額 ------------------------------------------------------
+   白地に対して縁を締め、絵そのものが持つ色を邪魔しない。 */
+.card-art__fallback::before { opacity: .28; }
+.matchup-chip.is-active .card-art { box-shadow: 0 6px 20px rgba(0, 0, 0, .45); }
+.spotlight__art .card-art,
+.card-stat > .card-art,
+.matchup-summary__art .card-art { box-shadow: 0 10px 26px rgba(17, 22, 40, .16), 0 1px 2px rgba(17, 22, 40, .12); }
+
+/* --- 14. デッキ / ログの見出し色を統一 ------------------------------------ */
+.deck-rank { color: var(--muted); font-size: .82rem; }
+.result-badge--win { background: var(--win); }
+.result-badge--lose { background: var(--lose); }
+
+/* --- 15. 順位表記 ----------------------------------------------------------
+   カード統計は3列に詰めたことで順位欄が潰れ、"01" が縦に折り返していた。 */
+.card-stat__rank {
+  min-width: 24px;
+  writing-mode: horizontal-tb;
+  font-family: inherit;
+  font-size: .82rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.synergy-card__rank { min-width: 24px; font-family: inherit; font-size: .82rem; font-weight: 900; white-space: nowrap; }
+.deck-rank {
+  align-self: start;
+  justify-items: start;
+  padding-top: 2px;
+  border-right: 0;
+  color: var(--muted);
+  font-size: .9rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+/* --- 16. カード画像の比率を実物に合わせる（716 x 996） -------------------- */
+.card-art { aspect-ratio: 716 / 996; }
+.lineup-card .card-art, .deck-lineup__leaders .card-art { aspect-ratio: 716 / 996; }
