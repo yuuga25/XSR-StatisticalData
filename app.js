@@ -25,7 +25,7 @@
     encryptedBuffer: null, data: null, prepared: null, activeView: 'overview',
     deckMode: 'all', deckLimit: 30, deckCompare: new Map(), cardType: 'leader',
     selectedTacticDeck: '', logPage: 1, toastTimer: null,
-    matchupMode: 'matchup', matchupLeader: '', synergyLimit: 24,
+    matchupMode: 'matchup', matchupDeck: '', synergyLimit: 24,
     isTransitioning: false, pendingView: null
   };
   const imageResolutionCache = new Map();
@@ -152,10 +152,10 @@
       renderMatchup();
     }));
     $('#matchupSort').addEventListener('change', renderMatchup);
-    $('#matchupLeaderRail').addEventListener('click', event => {
-      const button = event.target.closest('[data-matchup-leader]');
+    $('#matchupDeckRail').addEventListener('click', event => {
+      const button = event.target.closest('[data-matchup-deck]');
       if (!button) return;
-      state.matchupLeader = decodeURIComponent(button.dataset.matchupLeader);
+      state.matchupDeck = decodeURIComponent(button.dataset.matchupDeck);
       renderMatchup();
     });
     $('#synergyMore').addEventListener('click', () => { state.synergyLimit += 24; renderSynergy(); });
@@ -287,9 +287,8 @@
       summary, decks, cardGroups,
       firstSecond: recordsFromSheet(data, 'G1_FirstSecond', 1),
       leadStats: recordsFromSheet(data, 'G5_LeadWinRate', 1),
-      roundStats: buildRoundStats(logs),
       dailyTrend: buildDailyTrend(logs),
-      matchups: buildMatchups(logs),
+      deckMatchups: buildDeckMatchups(logs),
       synergy: buildSynergy(logs),
       tacticGroups, logs,
       meta: {
@@ -454,26 +453,6 @@
     }).filter(group => group.items.length);
   }
 
-  function buildRoundStats(logs) {
-    if (!logs.length) return [];
-    const rows = [];
-    ['合計', '先攻', '後攻'].forEach(side => {
-      ['1R', '2R', '3R'].forEach(round => {
-        const subset = side === '合計' ? logs : logs.filter(log => log['先後'] === side);
-        // 1R/2Rが同結果なら2本で決着し3Rは「-」。母数から外す。
-        const played = subset.filter(log => log[round] === '勝' || log[round] === '負');
-        const wins = played.filter(log => log[round] === '勝').length;
-        rows.push({
-          'ラウンド': round, '先後': side, '試合数': played.length, '勝数': wins,
-          '勝率': played.length ? wins / played.length : 0,
-          '信頼下限': wilsonLower(wins, played.length),
-          '構成比': logs.length ? played.length / logs.length : 0
-        });
-      });
-    });
-    return rows;
-  }
-
   function buildDailyTrend(logs) {
     if (!logs.length) return [];
     const days = new Map();
@@ -498,19 +477,43 @@
     });
   }
 
-  function buildMatchups(logs) {
+  /**
+   * デッキ（リーダー4体＋ACE）ごとの対面成績。
+   * 相手側もデッキ単位にすると、1,308試合では10試合以上の組み合わせが
+   * 1つも成立しない（最大9試合）ため、相手側はリーダー単位で数える。
+   */
+  function buildDeckMatchups(logs) {
     if (!logs.length) return [];
-    const counter = tallyLogs(logs, log => {
-      const mine = new Set(logLeaders(log, '自分'));
-      const theirs = new Set(logLeaders(log, '相手'));
-      const pairs = [];
-      mine.forEach(self => theirs.forEach(opponent => pairs.push(`${self}${KEY_SEP}${opponent}`)));
-      return pairs;
+    const decks = new Map();
+    logs.forEach(log => {
+      const leaders = logLeaders(log, '自分');
+      if (leaders.length !== 4) return;
+      const aces = logAces(log, '自分');
+      const label = `${leaders.join(' / ')} ＋ ${aces.join(' / ')}`;
+      if (!decks.has(label)) {
+        decks.set(label, { label, leaders, aces, games: 0, wins: 0, vs: new Map(), search: normalizeText([...leaders, ...aces].join(' ')) });
+      }
+      const deck = decks.get(label);
+      const win = log['結果'] === '勝' ? 1 : 0;
+      deck.games += 1;
+      deck.wins += win;
+      new Set(logLeaders(log, '相手')).forEach(opponent => {
+        const row = deck.vs.get(opponent) || { opponent, games: 0, wins: 0 };
+        row.games += 1;
+        row.wins += win;
+        deck.vs.set(opponent, row);
+      });
     });
-    return [...counter.entries()].map(([key, [games, wins]]) => {
-      const [self, opponent] = key.split(KEY_SEP);
-      return { self, opponent, games, wins, winRate: games ? wins / games : 0, confidence: wilsonLower(wins, games) };
-    }).sort((a, b) => b.games - a.games || b.winRate - a.winRate);
+    return [...decks.values()].map(deck => ({
+      ...deck,
+      winRate: deck.games ? deck.wins / deck.games : 0,
+      confidence: wilsonLower(deck.wins, deck.games),
+      vs: [...deck.vs.values()].map(row => ({
+        ...row,
+        winRate: row.games ? row.wins / row.games : 0,
+        confidence: wilsonLower(row.wins, row.games)
+      }))
+    })).sort((a, b) => b.games - a.games || b.winRate - a.winRate);
   }
 
   function buildSynergy(logs) {
@@ -596,33 +599,11 @@
     $('#leaderSpotlight').innerHTML = spotlightHTML(getGroup('leader'), 'leader', false);
     $('#aceSpotlight').innerHTML = spotlightHTML(getGroup('ace'), 'ace', false);
     $('#tacticsSpotlight').innerHTML = spotlightHTML(getGroup('tactics'), 'tactics', true);
-    renderRoundChart();
     renderDailyTrend();
     const noteKeys = ['記載方針', '進行の定義', '信頼下限'];
     $('#summaryNotes').innerHTML = noteKeys.filter(key => summary.has(key)).map(key => `<div class="note"><b>${escapeHtml(key)}</b><p>${escapeHtml(summary.get(key))}</p></div>`).join('');
     hydrateCardImages($('[data-view-panel="overview"]'));
     animateVisuals($('[data-view-panel="overview"]'));
-  }
-
-  function renderRoundChart() {
-    const rows = state.prepared.roundStats || [];
-    const container = $('#roundChart');
-    if (!container) return;
-    if (!rows.length) return void (container.innerHTML = '<div class="empty-state">ラウンド別データがない。</div>');
-    const pick = (round, side) => rows.find(row => row['ラウンド'] === round && row['先後'] === side) || {};
-    container.innerHTML = ['1R', '2R', '3R'].map(round => {
-      const total = pick(round, '合計');
-      const first = pick(round, '先攻');
-      const second = pick(round, '後攻');
-      return `<div class="round-row">
-        <div class="round-row__head">
-          <div><strong>${round}</strong><small>${formatInt(total['試合数'])}試合</small></div>
-          <span class="round-row__rate">${percent(total['勝率'], 1)}</span>
-        </div>
-        ${winBarHTML(total['勝率'])}
-        <div class="round-row__split"><span>先攻 <b>${percent(first['勝率'], 1)}</b></span><span>後攻 <b>${percent(second['勝率'], 1)}</b></span></div>
-      </div>`;
-    }).join('') + `<p class="round-chart__note">3Rは1R/2Rが同結果で決着した試合を母数から除いている。</p>`;
   }
 
   function renderDailyTrend() {
@@ -924,25 +905,13 @@
     animateVisuals($('[data-view-panel="tactics"]'));
   }
 
-  function leaderStatsMap() {
-    const group = state.prepared.cardGroups.find(item => item.key === 'leader');
-    return new Map((group?.items || []).map(item => [item.name, item]));
-  }
-  function matchupSelfLeaders() {
-    const stats = leaderStatsMap();
-    const names = [...new Set(state.prepared.matchups.map(item => item.self))];
-    return names
-      .map(name => ({ name, stat: stats.get(name) }))
-      .sort((a, b) => number(b.stat?.games) - number(a.stat?.games) || a.name.localeCompare(b.name, 'ja'));
-  }
   function initializeMatchup() {
-    if (!state.prepared.matchups.length && !state.prepared.synergy.length) {
+    if (!state.prepared.deckMatchups.length && !state.prepared.synergy.length) {
       $('#matchupPane').innerHTML = '<div class="empty-state"><strong>対面データがない</strong>RawLogsに相手リーダーの記録が必要。</div>';
       $('#synergyPane').innerHTML = '';
       return;
     }
-    const leaders = matchupSelfLeaders();
-    state.matchupLeader = leaders[0]?.name || '';
+    state.matchupDeck = state.prepared.deckMatchups[0]?.label || '';
     state.synergyLimit = 24;
     renderMatchup();
   }
@@ -951,26 +920,26 @@
     const synergy = state.matchupMode === 'synergy';
     $('#matchupPane').hidden = synergy;
     $('#synergyPane').hidden = !synergy;
-    $('#matchupSearch').placeholder = synergy ? 'リーダー名で検索' : '自分のリーダーを検索';
+    $('#matchupSearch').placeholder = synergy ? 'リーダー名で検索' : 'リーダー・ACEでデッキを検索';
     if (synergy) renderSynergy(); else renderMatchupBoard();
     animateVisuals($('[data-view-panel="matchup"]'));
   }
 
   function renderMatchupBoard() {
     const query = normalizeText($('#matchupSearch').value);
-    const leaders = matchupSelfLeaders();
-    const visible = leaders.filter(item => !query || normalizeText(item.name).includes(query));
-    if (visible.length && !visible.some(item => item.name === state.matchupLeader)) {
-      state.matchupLeader = visible[0].name;
+    const decks = state.prepared.deckMatchups;
+    const visible = decks.filter(deck => !query || deck.search.includes(query));
+    if (visible.length && !visible.some(deck => deck.label === state.matchupDeck)) {
+      state.matchupDeck = visible[0].label;
     }
-    $('#matchupLeaderRail').innerHTML = visible.length ? visible.map(item => `
-      <button class="matchup-chip ${item.name === state.matchupLeader ? 'is-active' : ''}" type="button" data-matchup-leader="${encodeURIComponent(item.name)}">
-        ${cardArtHTML(item.name, 'leader', 'sm')}
-        <b>${escapeHtml(item.name)}</b>
-        <small>${formatInt(item.stat?.games)}試合 / ${percent(item.stat?.winRate, 0)}</small>
-      </button>`).join('') : '<div class="empty-state">該当するリーダーがいない。</div>';
+    $('#matchupDeckRail').innerHTML = visible.length ? visible.slice(0, 40).map(deck => `
+      <button class="matchup-chip matchup-chip--deck ${deck.label === state.matchupDeck ? 'is-active' : ''}" type="button" data-matchup-deck="${encodeURIComponent(deck.label)}">
+        <span class="matchup-chip__cards">${deck.leaders.map(name => cardArtHTML(name, 'leader', 'xs')).join('')}</span>
+        <b>${escapeHtml(deck.leaders.join(' / '))}</b>
+        <small>${formatInt(deck.games)}試合 / ${percent(deck.winRate, 0)}</small>
+      </button>`).join('') : '<div class="empty-state">該当するデッキがない。</div>';
 
-    const stats = leaderStatsMap().get(state.matchupLeader);
+    const deck = decks.find(item => item.label === state.matchupDeck);
     const minGames = Math.max(1, number($('#matchupMinGames').value) || 1);
     const sort = $('#matchupSort').value;
     const sorters = {
@@ -978,28 +947,27 @@
       winrate: (a, b) => b.winRate - a.winRate || b.games - a.games,
       games: (a, b) => b.games - a.games || b.winRate - a.winRate
     };
-    const rows = state.prepared.matchups
-      .filter(item => item.self === state.matchupLeader && item.games >= minGames)
-      .sort(sorters[sort] || sorters.confidence);
+    const rows = (deck?.vs || []).filter(row => row.games >= minGames).sort(sorters[sort] || sorters.confidence);
     $('#matchupCountBadge strong').textContent = formatInt(rows.length);
 
     const best = [...rows].sort((a, b) => b.confidence - a.confidence)[0];
     const worst = [...rows].sort((a, b) => a.confidence - b.confidence)[0];
-    const totalGames = sum(rows.map(item => item.games));
-    const totalWins = sum(rows.map(item => item.wins));
 
-    $('#matchupDetail').innerHTML = state.matchupLeader ? `
+    $('#matchupDetail').innerHTML = deck ? `
       <div class="panel__head">
-        <div><p class="kicker">VS OPPONENT LEADERS</p><h3>${escapeHtml(state.matchupLeader)} の対面成績</h3></div>
+        <div><p class="kicker">VS OPPONENT LEADERS</p><h3>このデッキの対面成績</h3></div>
         <span class="panel__meta">MIN ${formatInt(minGames)} GAMES</span>
       </div>
+      <div class="matchup-deck">
+        <div class="matchup-deck__leaders">${deck.leaders.map(name => lineupCardHTML(name, 'leader')).join('')}</div>
+        <div class="matchup-deck__aces"><span>ACE</span>${deck.aces.length ? deck.aces.map(name => cardChipHTML(name, 'ace', true)).join('') : '<b>記録なし</b>'}</div>
+      </div>
       <div class="matchup-summary">
-        <div class="matchup-summary__art">${cardArtHTML(state.matchupLeader, 'leader', 'lg')}</div>
         <div class="matchup-summary__metrics">
-          <div><span>採用試合</span><strong>${formatInt(stats?.games)}</strong></div>
-          <div><span>単体勝率</span><strong>${percent(stats?.winRate, 1)}</strong></div>
-          <div><span>対面数</span><strong>${formatInt(rows.length)}</strong></div>
-          <div><span>対面通算</span><strong>${percent(totalGames ? totalWins / totalGames : 0, 1)}</strong></div>
+          <div><span>試合数</span><strong>${formatInt(deck.games)}</strong></div>
+          <div><span>勝数</span><strong>${formatInt(deck.wins)}</strong></div>
+          <div><span>勝率</span><strong>${percent(deck.winRate, 1)}</strong></div>
+          <div><span>信頼下限</span><strong>${percent(deck.confidence, 1)}</strong></div>
         </div>
         <div class="matchup-summary__edges">
           ${edgeHTML('得意', best, 'is-good')}
@@ -1008,8 +976,9 @@
       </div>
       <div class="matchup-list">${rows.length ? rows.map(matchupRowHTML).join('')
         : '<div class="empty-state"><strong>条件に合う対面がない</strong>最低試合数を下げて。</div>'}</div>
-      <p class="panel__note">バーは勝率50%を中心に、右へ伸びるほど有利。試合数が少ない対面は信頼下限が大きく下がる。</p>`
-      : '<div class="empty-state">リーダーを選択して。</div>';
+      <p class="panel__note">相手はリーダー単位で数えている。相手もデッキ単位にすると、この期間では10試合以上の組み合わせが1つも成立しない（最大9試合）ため。
+        バーは勝率50%を中心に、右へ伸びるほど有利。</p>`
+      : '<div class="empty-state">デッキを選択して。</div>';
     hydrateCardImages($('[data-view-panel="matchup"]'));
   }
   function edgeHTML(label, item, tone) {

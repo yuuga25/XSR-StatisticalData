@@ -129,16 +129,10 @@
           </article>
         </div>
 
-        <div class="layout-two motion-group">
-          <article class="panel panel--tall">
-            <div class="panel__head"><div><p class="kicker">ROUND BREAKDOWN</p><h3>ラウンド別の勝率</h3></div><span class="panel__meta">1R / 2R / 3R</span></div>
-            <div id="roundChart" class="round-chart"></div>
-          </article>
-          <article class="panel panel--tall">
-            <div class="panel__head"><div><p class="kicker">DAILY TREND</p><h3>日別の推移</h3></div><span class="panel__meta">MATCHES / WIN RATE</span></div>
-            <div id="dailyTrendChart" class="trend-chart"></div>
-          </article>
-        </div>
+        <article class="panel motion-item">
+          <div class="panel__head"><div><p class="kicker">DAILY TREND</p><h3>日別の推移</h3></div><span class="panel__meta">MATCHES / WIN RATE</span></div>
+          <div id="dailyTrendChart" class="trend-chart"></div>
+        </article>
 
         <article class="panel motion-item">
           <div class="panel__head"><div><p class="kicker">TOP DECKS</p><h3>信頼下限ランキング</h3></div><button class="text-link" type="button" data-jump="decks">すべて表示</button></div>
@@ -192,18 +186,18 @@
       </section>
 
       <section class="view" data-view-panel="matchup">
-        <div class="page-head motion-item"><div><p class="kicker">MATCHUP &amp; SYNERGY</p><h2>対面・相性</h2><p>相手リーダーとの対面成績と、リーダー2体の噛み合い</p></div><div id="matchupCountBadge" class="count-badge"><span>RESULT</span><strong>—</strong></div></div>
+        <div class="page-head motion-item"><div><p class="kicker">MATCHUP &amp; SYNERGY</p><h2>対面・相性</h2><p>デッキごとの対面成績と、リーダー2体の噛み合い</p></div><div id="matchupCountBadge" class="count-badge"><span>RESULT</span><strong>—</strong></div></div>
         <div class="control-bar motion-item">
-          <div id="matchupModeTabs" class="tabs"><button class="is-active" type="button" data-matchup-mode="matchup">対面</button><button type="button" data-matchup-mode="synergy">リーダー相性</button></div>
-          <label class="search-control search-control--wide"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="matchupSearch" type="search" placeholder="リーダー名で検索"></label>
-          <label class="select-control"><span>最低試合数</span><input id="matchupMinGames" type="number" min="1" step="1" value="10"></label>
+          <div id="matchupModeTabs" class="tabs"><button class="is-active" type="button" data-matchup-mode="matchup">デッキ対面</button><button type="button" data-matchup-mode="synergy">リーダー相性</button></div>
+          <label class="search-control search-control--wide"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="matchupSearch" type="search" placeholder="リーダー・ACEでデッキを検索"></label>
+          <label class="select-control"><span>最低試合数</span><input id="matchupMinGames" type="number" min="1" step="1" value="3"></label>
           <label class="select-control"><span>並び順</span><select id="matchupSort"><option value="confidence">信頼下限</option><option value="winrate">勝率</option><option value="games">試合数</option></select></label>
         </div>
 
         <div id="matchupPane">
           <article class="panel motion-item">
-            <div class="panel__head"><div><p class="kicker">YOUR LEADER</p><h3>自分のリーダーを選ぶ</h3></div><span class="panel__meta">SELECT TO COMPARE</span></div>
-            <div id="matchupLeaderRail" class="matchup-rail"></div>
+            <div class="panel__head"><div><p class="kicker">YOUR DECK</p><h3>自分のデッキを選ぶ</h3></div><span class="panel__meta">SELECT TO COMPARE</span></div>
+            <div id="matchupDeckRail" class="matchup-rail"></div>
           </article>
           <article id="matchupDetail" class="panel motion-item"></article>
         </div>

@@ -948,3 +948,47 @@ body:not(.is-loading) .loading-screen { display: none; }
 .kicker { font-size: .78rem; }
 .match-side__head span { font-size: .78rem; }
 .match-tactic i { width: 20px; height: 20px; font-size: .78rem; }
+
+/* --- モバイル: 制御バーのはみ出し修正 ---------------------------------------
+   タブが6個に増えたことで .tabs が折り返しも横スクロールもせずに伸び、
+   縦積みの .control-bar 全体を画面幅より広げていた。
+   flex アイテムは min-width:auto が既定のため、幅の広い子が兄弟まで押し広げる。 */
+@media (max-width: 760px) {
+  .control-bar { align-items: stretch; }
+  .control-bar > * { min-width: 0; max-width: 100%; }
+  .tabs { display: flex; flex-wrap: wrap; width: 100%; }
+  .tabs button { flex: 1 1 auto; min-width: 0; padding: 9px 10px; font-size: .86rem; }
+  .search-control, .select-control { width: 100%; }
+  .search-control input, .select-control input, .select-control select { min-width: 0; }
+}
+
+/* --- 対面: デッキ単位 --------------------------------------------------------
+   相手はリーダー単位。相手もデッキ単位にすると、この期間では
+   10試合以上の組み合わせが1つも成立しない（最大9試合）ため。 */
+.matchup-chip--deck { width: 168px; }
+.matchup-chip__cards { display: flex; gap: 3px; width: 100%; justify-content: center; }
+.matchup-chip__cards .card-art { width: 36px; border-radius: 6px; }
+.matchup-chip--deck b { font-size: .8rem; line-height: 1.3; white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.matchup-chip--deck.is-active .card-art { box-shadow: 0 0 0 1px var(--accent), 0 0 18px -4px rgba(95,212,255,.6); }
+
+.matchup-deck { display: grid; gap: 14px; padding: 4px 22px 18px; }
+.matchup-deck__leaders { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; max-width: 560px; }
+.matchup-deck__aces { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.matchup-deck__aces > span { color: var(--tx-3); font-size: .78rem; font-weight: 800; letter-spacing: .12em; }
+.matchup-deck__aces > b { color: var(--tx-3); font-size: .86rem; }
+
+/* サマリーからカード画像の列が消えたので2カラムに */
+.matchup-summary { grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); }
+
+@media (max-width: 1200px) {
+  .matchup-summary { grid-template-columns: minmax(0, 1fr); }
+  .matchup-summary__edges { grid-column: auto; grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 760px) {
+  .matchup-chip--deck { width: 148px; }
+  .matchup-chip__cards .card-art { width: 32px; }
+  .matchup-deck { padding-inline: 16px; }
+  .matchup-deck__leaders { gap: 8px; }
+  .matchup-summary { grid-template-columns: minmax(0, 1fr); }
+  .matchup-summary__edges { grid-template-columns: 1fr; }
+}
