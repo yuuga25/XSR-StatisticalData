@@ -1166,18 +1166,23 @@
     const candidates = candidateImageUrls(name, role);
     const resolution = new Promise(resolve => {
       if (!candidates.length) return resolve(null);
-      const probe = new Image();
       let index = 0;
       const tryNext = () => {
         if (index >= candidates.length) return resolve(null);
         const candidate = candidates[index++];
+        // 候補ごとに Image を作り直す。使い回すと直前の失敗状態を引きずることがある
+        const probe = new Image();
         probe.onload = () => resolve(candidate);
         probe.onerror = tryNext;
         probe.src = candidate;
       };
       tryNext();
     }).catch(() => null);
+
+    // 失敗はキャッシュしない。通信の一時的な失敗を1枚だけ焼き付けてしまうと、
+    // そのカードだけ再読み込みするまで永久に空欄のままになる。
     imageResolutionCache.set(key, resolution);
+    resolution.then(source => { if (!source) imageResolutionCache.delete(key); });
     return resolution;
   }
 
