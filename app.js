@@ -630,8 +630,10 @@
     }).join('');
     const points = rows.map((row, i) => `${x(i).toFixed(1)},${yRate(number(row['勝率'])).toFixed(1)}`).join(' ');
 
+    // 狭い画面では日付ラベルが重なるので間引きを広げる
+    const labelStep = window.innerWidth < 560 ? 4 : 3;
     const labels = rows.map((row, i) => {
-      if (rows.length > 10 && i % 3 !== 0 && i !== rows.length - 1) return '';
+      if (rows.length > 10 && i % labelStep !== 0 && i !== rows.length - 1) return '';
       const short = formatExcelDate(row['大会日付']).replace(/^\d{4}\//, '');
       return `<span style="left:${(x(i) / W * 100).toFixed(2)}%">${escapeHtml(short)}</span>`;
     }).join('');

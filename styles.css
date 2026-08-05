@@ -541,7 +541,7 @@ body:not(.is-loading) .loading-screen { display: none; }
 
 /* --- 戦術構成 ------------------------------------------------------------- */
 .tactic-deck-rail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
-.tactic-deck-choice { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--s1); text-align: left; transition: .18s; }
+.tactic-deck-choice { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--s1); text-align: left; transition: .18s; }
 .tactic-deck-choice:hover { border-color: var(--line-2); background: var(--s2); }
 .tactic-deck-choice.is-active { border-color: var(--accent); background: var(--s2); }
 .tactic-deck-choice__index { color: var(--tx-3); font-size: .82rem; font-weight: 900; }
@@ -991,4 +991,51 @@ body:not(.is-loading) .loading-screen { display: none; }
   .matchup-deck__leaders { gap: 8px; }
   .matchup-summary { grid-template-columns: minmax(0, 1fr); }
   .matchup-summary__edges { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================================
+   モバイル実機幅（390px）で見つかった破綻の修正
+   ========================================================================== */
+@media (max-width: 760px) {
+  /* 検索欄が縦に約230pxまで伸びていた。
+     .control-bar を縦積みにすると flex-basis は「高さ」に効くため、
+     .search-control の flex:1 1 260px が高さ260pxとして解釈されていた。 */
+  .control-bar > * { flex: 0 0 auto; }
+  .search-control { min-height: 48px; }
+  .select-control input, .select-control select { min-height: 48px; }
+
+  /* カード統計: 勝率の値が右端で切れ、「信頼下限」が折れて数値と衝突していた */
+  .card-stat { grid-template-columns: auto 96px minmax(0, 1fr); gap: 12px; padding: 14px; }
+  .card-stat > .card-art { width: 96px; }
+  .card-stat__rank { min-width: 20px; font-size: .84rem; }
+  .card-stat__body h3 { margin-bottom: 10px; font-size: 1.08rem; }
+  .card-stat__headline > div { padding: 8px 10px; }
+  .card-stat__headline strong { font-size: 1.28rem; }
+  .card-stat__bar { margin: 10px 0; }
+  .card-stat__minor { grid-template-columns: repeat(auto-fit, minmax(86px, 1fr)); gap: 6px 8px; }
+  .card-stat__minor strong { font-size: .95rem; }
+
+  /* 見出し脇の件数バッジが単独行に落ちて左寄せになっていた */
+  .page-head { flex-wrap: nowrap; align-items: flex-end; gap: 12px; }
+  .page-head > div:first-child { min-width: 0; }
+  .page-head h2 { font-size: 1.68rem; }
+  .page-head > div:first-child > p:last-child { font-size: .88rem; }
+  .count-badge { justify-items: end; }
+  .count-badge strong { font-size: 1.7rem; }
+
+  /* パネル見出しが語中で折り返していた */
+  .panel__head { flex-wrap: wrap; gap: 6px 12px; }
+  .panel__head h3 { font-size: 1.18rem; }
+  .panel__head > div { min-width: 0; }
+
+  /* ACEチップが1行1個で間延びしていた */
+  .card-chip { padding: 3px 10px 3px 3px; }
+  .card-chip .card-art { width: 28px; }
+  .deck-lineup__aces, .matchup-deck__aces { gap: 6px; }
+}
+@media (max-width: 760px) {
+  /* 4列のまま幅を詰める（画像を消さずに収める） */
+  .tactic-deck-choice { gap: 9px; padding: 10px; }
+  .tactic-deck-choice__leaders .card-art { width: 24px; border-radius: 4px; }
+  .tactic-deck-choice__uses strong { font-size: 1.05rem; }
 }
