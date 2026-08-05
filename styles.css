@@ -1158,7 +1158,10 @@ body:not(.is-loading) .loading-screen { display: none; }
 .deck-list > *:nth-child(6), .card-stats-grid > *:nth-child(6), .log-list > *:nth-child(6) { animation-delay: .22s; }
 
 /* --- 4. 数値バーが伸びた瞬間に光が走る ------------------------------------- */
-.mu-bar i, .rate-bar i { position: relative; overflow: hidden; }
+/* .mu-bar i は position:absolute で左端位置を決めているので上書きしない。
+   絶対配置は既に配置基準になるため、::after は relative なしで載る。 */
+.mu-bar i { overflow: hidden; }
+.rate-bar i { position: relative; overflow: hidden; }
 .mu-bar i::after, .rate-bar i::after {
   content: "";
   position: absolute; inset: 0;
@@ -1276,9 +1279,14 @@ body:not(.is-loading) .loading-screen { display: none; }
 @keyframes pulse-btn { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
 
 /* --- 9. グラフ --------------------------------------------------------------- */
-.trend-line { stroke-dasharray: 2400; stroke-dashoffset: 2400; animation: draw-line 1.8s var(--swift) .25s both; }
-@keyframes draw-line { to { stroke-dashoffset: 0; } }
-.trend-bar { transform-origin: 50% 100%; animation: grow-bar .7s var(--swift) both; }
+/* 破線の指定を要素側に置くと、アニメが走らなかったとき線が消えたままになる。
+   キーフレーム内だけで完結させ、終了後は素の実線に戻す。 */
+.trend-line { animation: draw-line 1.8s var(--swift) .25s backwards; }
+@keyframes draw-line {
+  from { stroke-dasharray: 4000; stroke-dashoffset: 4000; }
+  to   { stroke-dasharray: 4000; stroke-dashoffset: 0; }
+}
+.trend-bar { transform-origin: 50% 100%; animation: grow-bar .7s var(--swift) backwards; }
 @keyframes grow-bar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 .trend-bar:nth-child(3n) { animation-delay: .06s; }
 .trend-bar:nth-child(3n+1) { animation-delay: .12s; }
@@ -1294,6 +1302,4 @@ body:not(.is-loading) .loading-screen { display: none; }
   .deck-list > *, .card-stats-grid > *, .log-list > *, .synergy-grid > *, .sequence-list > * {
     opacity: 1 !important; transform: none !important;
   }
-  .trend-line { stroke-dashoffset: 0; }
-  .trend-bar { transform: none; }
 }
