@@ -1303,3 +1303,55 @@ body:not(.is-loading) .loading-screen { display: none; }
     opacity: 1 !important; transform: none !important;
   }
 }
+
+/* --- 統計ファイルにあって画面に出ていなかった項目 --------------------------- */
+/* Summary の数値行（取得ログ数・除外内訳など） */
+.notes-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  margin-bottom: 1px;
+  background: var(--line);
+}
+.notes-figures > div { padding: 14px 16px; background: var(--glass-2); }
+.notes-figures span { display: block; color: var(--tx-2); font-size: .8rem; line-height: 1.5; }
+.notes-figures strong { display: block; margin-top: 3px; font-size: 1.34rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+
+/* 進行別の先攻・後攻の内訳 */
+.flow-card__split { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 11px; }
+.flow-card__split > span { display: grid; color: var(--tx-2); font-size: .84rem; }
+.flow-card__split b { color: var(--tx-3); font-weight: 800; }
+.flow-card__split i { color: var(--tx-3); font-size: .78rem; font-style: normal; }
+.flow-card__lower b { color: var(--tx-3); }
+
+/* デッキの区分（本ランキング / 参考） */
+.deck-rank { display: grid; gap: 5px; justify-items: start; }
+.deck-rank__tag {
+  padding: 2px 7px; border-radius: 6px;
+  font-size: .68rem; font-style: normal; font-weight: 800; white-space: nowrap;
+}
+.deck-rank__tag.is-main { color: #06070a; background: var(--accent); }
+.deck-rank__tag.is-ref { color: var(--tx-3); background: rgba(255, 255, 255, .08); }
+
+/* カードのマスタID */
+.card-stat__id {
+  margin-left: 8px; padding: 2px 7px; border-radius: 5px;
+  color: var(--tx-3); background: rgba(255, 255, 255, .07);
+  font-size: .66rem; font-style: normal; font-weight: 800; letter-spacing: .04em; vertical-align: middle;
+}
+
+/* 対戦ログの記録メタ */
+.match-meta {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 1px; margin-top: 12px; overflow: hidden;
+  border-radius: var(--r-sm); background: var(--line);
+}
+.match-meta > div { padding: 10px 12px; background: rgba(20, 31, 63, .55); }
+.match-meta span { display: block; color: var(--tx-3); font-size: .76rem; }
+.match-meta b { display: block; margin-top: 2px; font-size: .86rem; font-weight: 700; }
+
+@media (max-width: 760px) {
+  .notes-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .match-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .flow-card__split { gap: 6px 12px; }
+}

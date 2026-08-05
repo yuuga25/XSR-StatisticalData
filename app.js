@@ -284,6 +284,7 @@
     ];
     const tacticGroups = buildTacticGroups(data, logs);
     return {
+      masters: buildMasters(data),
       summary, decks, cardGroups,
       firstSecond: recordsFromSheet(data, 'G1_FirstSecond', 1),
       leadStats: recordsFromSheet(data, 'G5_LeadWinRate', 1),
@@ -344,7 +345,8 @@
     return (p + z * z / (2 * n) - z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / (1 + z * z / n);
   }
 
-  const RAW_LOG_HIDDEN_FIELDS = new Set(['ownerUid', 'ログID', 'ドキュメントID', 'ステータス']);
+  // 個人識別子だけ落とす。ステータスは表示対象なので除外しない。
+  const RAW_LOG_HIDDEN_FIELDS = new Set(['ownerUid', 'ログID', 'ドキュメントID']);
   function sanitizeLogRecord(record, index) {
     const clean = { __index: index };
     Object.entries(record).forEach(([key, value]) => {
@@ -357,6 +359,22 @@
     clean.__search = normalizeText(searchable);
     return clean;
   }
+  /**
+   * LeaderMaster / AceMaster / TacticsMaster は id と name の対応表。
+   * カード統計から引けるよう、名前 → ID の逆引きにして持つ。
+   */
+  function buildMasters(data) {
+    const map = new Map();
+    [['LeaderMaster', 'leader'], ['AceMaster', 'ace'], ['TacticsMaster', 'tactics']].forEach(([sheet, role]) => {
+      // このシートだけヘッダーが1行目にある
+      recordsFromSheet(data, sheet, 0).forEach(record => {
+        const name = String(record['name'] || '').trim();
+        if (name) map.set(name, { id: record['id'], role, sheet });
+      });
+    });
+    return map;
+  }
+
   function buildTacticGroups(data, logs) {
     const groups = new Map();
     const add = (deck, item) => {
@@ -582,13 +600,20 @@
       </div>`).join('')
       + `<div class="turn-delta"><span>先後差</span><strong>${delta >= 0 ? '+' : '−'}${Math.abs(delta * 100).toFixed(1)} pt</strong></div>`
       + `<p class="chart-note">バーは勝率50%を中心に、右へ伸びるほど有利。</p>`;
+    // G5 は 進行 × 先後 の6行ある。合計だけでなく先攻・後攻の内訳と信頼下限も出す。
     const leadTotal = leadStats.filter(row => row['先後'] === '合計');
-    $('#leadFlowChart').innerHTML = leadTotal.map(row => `
-      <div class="flow-card">
+    $('#leadFlowChart').innerHTML = leadTotal.map(row => {
+      const parts = leadStats.filter(item => item['進行'] === row['進行'] && item['先後'] !== '合計');
+      return `<div class="flow-card">
         <div class="flow-card__head"><h4>${escapeHtml(row['進行'])}</h4><strong>${percent(row['勝率'], 1)}</strong></div>
         <div class="flow-card__meta"><span>${formatInt(row['勝数'])}勝 / ${formatInt(row['試合数'])}試合</span><span>構成比 ${percent(row['構成比'], 1)}</span></div>
         ${winBarHTML(row['勝率'])}
-      </div>`).join('');
+        <div class="flow-card__split">
+          ${parts.map(part => `<span><b>${escapeHtml(part['先後'])}</b> ${percent(part['勝率'], 1)}<i>${formatInt(part['試合数'])}試合 / 下限 ${percent(part['信頼下限'], 1)}</i></span>`).join('')}
+          <span class="flow-card__lower"><b>合計の信頼下限</b> ${percent(row['信頼下限'], 1)}</span>
+        </div>
+      </div>`;
+    }).join('');
     $('#overviewDecks').innerHTML = decks.all.slice(0, 6).map(deck => `
       <button class="top-deck" type="button" data-overview-deck="${deck.uid}">
         <span class="top-deck__rank">#${deck.rank}</span>
@@ -600,8 +625,23 @@
     $('#aceSpotlight').innerHTML = spotlightHTML(getGroup('ace'), 'ace', false);
     $('#tacticsSpotlight').innerHTML = spotlightHTML(getGroup('tactics'), 'tactics', true);
     renderDailyTrend();
-    const noteKeys = ['記載方針', '進行の定義', '信頼下限'];
-    $('#summaryNotes').innerHTML = noteKeys.filter(key => summary.has(key)).map(key => `<div class="note"><b>${escapeHtml(key)}</b><p>${escapeHtml(summary.get(key))}</p></div>`).join('');
+    // Summary の行を取りこぼさないよう、決め打ちのキーではなく全行を走査する。
+    // 数値の行は内訳ブロック、文章の行は注記として出す。
+    const skipKeys = new Set(['集計サマリー / 設定']);
+    const numeric = [], notes = [];
+    summary.forEach((value, key) => {
+      if (!key || key === '—' || skipKeys.has(key) || value == null || value === '') return;
+      const label = String(key);
+      if (typeof value === 'number' && !/^(最終更新|集計開始日|集計終了日)/.test(label)) numeric.push([label, value]);
+      else notes.push([label, value]);
+    });
+    $('#summaryNotes').innerHTML = `
+      ${numeric.length ? `<div class="notes-figures">${numeric.map(([label, value]) => `
+        <div><span>${escapeHtml(label)}</span><strong>${formatInt(value)}</strong></div>`).join('')}</div>` : ''}
+      ${notes.map(([label, value]) => `<div class="note"><b>${escapeHtml(label)}</b><p>${escapeHtml(
+        typeof value === 'number' && /^(最終更新)/.test(label) ? formatDateTime(value)
+          : /^(集計開始日|集計終了日)/.test(label) ? formatExcelDate(value)
+          : value)}</p></div>`).join('')}`;
     hydrateCardImages($('[data-view-panel="overview"]'));
     animateVisuals($('[data-view-panel="overview"]'));
   }
@@ -701,7 +741,7 @@
     $('#deckList').innerHTML = visible.length ? visible.map(deck => {
       const selected = state.deckCompare.has(deck.uid);
       return `<article class="deck-card ${selected ? 'is-selected' : ''}">
-        <div class="deck-rank">#${deck.rank}</div>
+        <div class="deck-rank">#${deck.rank}${deck.category ? `<em class="deck-rank__tag ${deck.category.startsWith('本') ? 'is-main' : 'is-ref'}">${escapeHtml(deck.category)}</em>` : ''}</div>
         <div class="deck-lineup">
           <div class="deck-lineup__leaders" data-card-count="${deck.leaders.length}">${deck.leaders.map(name => lineupCardHTML(name, 'leader')).join('')}</div>
           <div class="deck-lineup__aces"><span class="deck-lineup__label">ACE</span>${deck.aces.map(name => cardChipHTML(name, 'ace', true)).join('')}</div>
@@ -816,7 +856,10 @@
     $('#cardStatsList').innerHTML = list.length ? list.map((item, index) => `<article class="card-stat${group.opponent ? ' card-stat--opponent' : ''}">
       <span class="card-stat__rank">${String(index + 1).padStart(2, '0')}</span>
       ${cardArtHTML(item.name, group.role, 'lg')}
-      <div class="card-stat__body"><h3>${escapeHtml(item.name)}${group.opponent ? '<em class="card-stat__side">VS</em>' : ''}</h3>
+      <div class="card-stat__body"><h3>${escapeHtml(item.name)}${group.opponent ? '<em class="card-stat__side">VS</em>' : ''}${(() => {
+        const master = state.prepared.masters?.get(item.name);
+        return master ? `<em class="card-stat__id" title="${escapeHtml(master.sheet)}">ID ${escapeHtml(String(master.id))}</em>` : '';
+      })()}</h3>
         <div class="card-stat__headline"><div><span>${rateLabel}</span><strong>${percent(item.adoptionRate, 1)}</strong></div><div><span>${winLabel}</span><strong>${percent(item.winRate, 1)}</strong></div></div>
         <div class="card-stat__bar"><div class="rate-bar"><i data-bar="${Math.max(item.adoptionRate / maxRate * 100, 1)}%"></i></div></div>
         <div class="card-stat__minor"><div><span>${countLabel}</span><strong>${formatInt(item.count)}</strong></div><div><span>試合数</span><strong>${formatInt(item.games)}</strong></div><div><span>信頼下限</span><strong>${percent(item.confidence, 1)}</strong></div></div>
@@ -1092,10 +1135,30 @@
             ${matchTacticsHTML('相手のタクティクス', opponentTactics)}
           </div>
           ${log['メモ'] ? `<div class="match-note"><b>MEMO</b><p>${escapeHtml(log['メモ'])}</p></div>` : ''}
+          ${logMetaHTML(log)}
         </div>
       </details>
     </article>`;
   }
+  /**
+   * RawLogs のうち、これまで画面に出していなかった列。
+   * qualityScore は Summary の定義（1:相手リーダーのみ 〜 4:全揃い）に対応する。
+   * winBits は 1R/2R/3R の勝敗をビットで持った元データ。
+   */
+  function logMetaHTML(log) {
+    const quality = number(log['qualityScore']);
+    const qualityLabel = { 1: '相手リーダーのみ', 2: '相手ACEまで', 3: '自タクティクスまで', 4: '全揃い' }[quality] || '—';
+    const rows = [
+      ['記録精度', quality ? `${quality} / 4 ・ ${qualityLabel}` : '—'],
+      ['winBits', log['winBits'] != null && log['winBits'] !== '' ? String(log['winBits']) : '—'],
+      ['ステータス', log['ステータス'] || '—'],
+      ['作成日時', formatDateTime(log['作成日時']) || '—'],
+      ['更新日時', formatDateTime(log['更新日時']) || '—']
+    ];
+    return `<div class="match-meta">${rows.map(([label, value]) =>
+      `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>`).join('')}</div>`;
+  }
+
   function matchSideHTML(eyebrow, label, leaders, aces, side) {
     return `<section class="match-side match-side--${side}">
       <div class="match-side__head"><span>${escapeHtml(eyebrow)}</span><b>${escapeHtml(label)}</b></div>
