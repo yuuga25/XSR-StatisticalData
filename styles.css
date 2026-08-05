@@ -1039,3 +1039,261 @@ body:not(.is-loading) .loading-screen { display: none; }
   .tactic-deck-choice__leaders .card-art { width: 24px; border-radius: 4px; }
   .tactic-deck-choice__uses strong { font-size: 1.05rem; }
 }
+
+/* ==========================================================================
+   MOTION
+   方針:
+   - 動かすのは transform と opacity と filter だけ。レイアウトを動かさない。
+   - 無限ループは背景の数要素だけ。カード700枚超に常時アニメは載せない。
+   - 全部 prefers-reduced-motion で止まる（末尾に一括停止を置く）。
+   ========================================================================== */
+
+/* --- 共通イージング --------------------------------------------------------- */
+:root {
+  --spring: cubic-bezier(.34, 1.56, .64, 1);
+  --swift: cubic-bezier(.2, .9, .25, 1);
+}
+
+/* --- 1. 背景: 生きている夜空 ------------------------------------------------ */
+/* 光のにじみをゆっくり漂わせる */
+.backdrop__flare--a { animation: drift-a 34s ease-in-out infinite; }
+.backdrop__flare--b { animation: drift-b 41s ease-in-out infinite; }
+@keyframes drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(4vw, 3vh, 0) scale(1.12); }
+}
+@keyframes drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(-5vw, -2vh, 0) scale(1.08); }
+}
+
+/* 飛行機雲がゆっくり流れる */
+.backdrop__slashes { animation: contrail 26s linear infinite; }
+@keyframes contrail {
+  0%   { opacity: 0; transform: translate3d(-3%, 2%, 0); }
+  18%  { opacity: 1; }
+  72%  { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(4%, -3%, 0); }
+}
+
+/* 流れ星。18秒に一度、右上から左下へ一瞬だけ走る */
+.backdrop__mesh::after {
+  content: "";
+  position: absolute;
+  right: 14%;
+  top: 8%;
+  width: 160px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(190, 232, 255, .95), #fff);
+  box-shadow: 0 0 14px rgba(150, 215, 255, .9);
+  opacity: 0;
+  transform: rotate(28deg);
+  animation: shooting-star 18s ease-in infinite;
+}
+@keyframes shooting-star {
+  0%, 88%  { opacity: 0; transform: rotate(28deg) translate3d(0, 0, 0) scaleX(.2); }
+  90%      { opacity: 1; }
+  97%      { opacity: 0; transform: rotate(28deg) translate3d(-58vw, 42vh, 0) scaleX(1); }
+  100%     { opacity: 0; transform: rotate(28deg) translate3d(-58vw, 42vh, 0) scaleX(1); }
+}
+
+/* --- 2. ヒーロー: 勝率リングを回す ----------------------------------------- */
+.signal-ring::after { animation: ring-spin 14s linear infinite; }
+@keyframes ring-spin {
+  from { transform: rotate(-40deg); }
+  to   { transform: rotate(320deg); }
+}
+.signal-ring { animation: ring-breathe 6s ease-in-out infinite; }
+@keyframes ring-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(95, 212, 255, .16); }
+  50%      { box-shadow: 0 0 44px 6px rgba(95, 212, 255, .16); }
+}
+.signal-lines i { animation: spoke 4.5s ease-in-out infinite; }
+.signal-lines i:nth-child(2) { animation-delay: .5s; }
+.signal-lines i:nth-child(3) { animation-delay: 1s; }
+.signal-lines i:nth-child(4) { animation-delay: 1.5s; }
+.signal-lines i:nth-child(5) { animation-delay: 2s; }
+@keyframes spoke { 0%, 100% { opacity: .12; } 50% { opacity: .38; } }
+
+/* ブランドのXがときどき瞬く */
+.topbar .x-mark i:last-child { animation: x-glint 9s ease-in-out infinite; }
+@keyframes x-glint {
+  0%, 92%, 100% { filter: none; }
+  96%           { filter: drop-shadow(0 0 10px rgba(95, 212, 255, .9)); }
+}
+
+/* --- 3. 画面切り替え: パネルが順に立ち上がる --------------------------------
+   要素側に opacity:0 を置くと、アニメが発火しなかったときに戻る先が無く
+   中身が消えたままになる。初期状態はキーフレーム側に持たせ、
+   fill-mode は backwards にして「終わったら通常の見た目」に必ず戻す。 */
+.motion-item, .motion-group > *,
+.deck-list > *, .card-stats-grid > *, .log-list > *, .synergy-grid > *, .sequence-list > * {
+  opacity: 1;
+  transform: none;
+}
+.view.is-motion-ready .motion-item,
+.view.is-motion-ready .motion-group > * { animation: rise .62s var(--spring) backwards; }
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, 18px, 0) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+.view.is-motion-ready .motion-group > *:nth-child(1) { animation-delay: 0s; }
+.view.is-motion-ready .motion-group > *:nth-child(2) { animation-delay: .05s; }
+.view.is-motion-ready .motion-group > *:nth-child(3) { animation-delay: .1s; }
+.view.is-motion-ready .motion-group > *:nth-child(4) { animation-delay: .15s; }
+.view.is-motion-ready .motion-group > *:nth-child(5) { animation-delay: .2s; }
+.view.is-motion-ready .motion-group > *:nth-child(n+6) { animation-delay: .25s; }
+
+/* 一覧の行は上から順に流し込む（先頭12件だけ。以降は一括で出す） */
+.deck-list > *, .card-stats-grid > *, .log-list > *, .synergy-grid > *, .sequence-list > * {
+  animation: rise-soft .5s var(--swift) backwards;
+}
+@keyframes rise-soft { from { opacity: 0; transform: translate3d(0, 14px, 0); } to { opacity: 1; transform: none; } }
+.deck-list > *:nth-child(1), .card-stats-grid > *:nth-child(1), .log-list > *:nth-child(1) { animation-delay: .02s; }
+.deck-list > *:nth-child(2), .card-stats-grid > *:nth-child(2), .log-list > *:nth-child(2) { animation-delay: .06s; }
+.deck-list > *:nth-child(3), .card-stats-grid > *:nth-child(3), .log-list > *:nth-child(3) { animation-delay: .1s; }
+.deck-list > *:nth-child(4), .card-stats-grid > *:nth-child(4), .log-list > *:nth-child(4) { animation-delay: .14s; }
+.deck-list > *:nth-child(5), .card-stats-grid > *:nth-child(5), .log-list > *:nth-child(5) { animation-delay: .18s; }
+.deck-list > *:nth-child(6), .card-stats-grid > *:nth-child(6), .log-list > *:nth-child(6) { animation-delay: .22s; }
+
+/* --- 4. 数値バーが伸びた瞬間に光が走る ------------------------------------- */
+.mu-bar i, .rate-bar i { position: relative; overflow: hidden; }
+.mu-bar i::after, .rate-bar i::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .55), transparent);
+  transform: translateX(-100%);
+  animation: bar-sheen 1.6s var(--swift) .35s 1;
+}
+@keyframes bar-sheen { to { transform: translateX(200%); } }
+
+/* 勝率が極端な行は、ごく弱く脈打たせて視線を集める。
+   影のアニメは合成ではなく再描画になるため、上位3行だけに絞る。 */
+.matchup-row:nth-child(-n+3).is-good .mu-bar i { animation: pulse-good 3.2s ease-in-out infinite 1.4s; }
+.matchup-row:nth-child(-n+3).is-bad .mu-bar i { animation: pulse-bad 3.2s ease-in-out infinite 1.4s; }
+@keyframes pulse-good {
+  0%, 100% { box-shadow: 0 0 16px rgba(51, 224, 163, .4); }
+  50%      { box-shadow: 0 0 26px rgba(51, 224, 163, .75); }
+}
+@keyframes pulse-bad {
+  0%, 100% { box-shadow: 0 0 16px rgba(255, 107, 131, .35); }
+  50%      { box-shadow: 0 0 26px rgba(255, 107, 131, .7); }
+}
+
+/* --- 5. カード絵 ------------------------------------------------------------ */
+/* 読み込み前はスケルトンを流す */
+.card-art:not(.has-image) .card-art__fallback::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .07) 50%, transparent 65%);
+  background-size: 240% 100%;
+  animation: skeleton 1.6s linear infinite;
+}
+@keyframes skeleton { from { background-position: 140% 0; } to { background-position: -140% 0; } }
+
+/* 読み込み完了時にふわっと立ち上げる */
+.card-art.has-image img { animation: card-in .55s var(--swift) both; }
+@keyframes card-in { from { opacity: 0; transform: scale(1.06); } to { opacity: 1; transform: none; } }
+
+/* ホバーで持ち上げて発光 */
+.card-art { transition: transform .3s var(--spring), box-shadow .3s var(--swift); }
+.deck-card:hover .deck-lineup__leaders .card-art,
+.card-stat:hover > .card-art,
+.matchup-chip:hover .card-art,
+.synergy-card:hover .card-art { transform: translateY(-4px) scale(1.02); }
+.card-stat:hover > .card-art { box-shadow: 0 0 0 1px rgba(170,210,255,.3), 0 16px 34px rgba(2,5,14,.75), 0 0 42px -6px rgba(95,212,255,.6); }
+
+/* 選択中のデッキチップはゆっくり呼吸する */
+.matchup-chip.is-active { animation: chip-breathe 3.6s ease-in-out infinite; }
+@keyframes chip-breathe {
+  0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 0 0 rgba(95, 212, 255, .28); }
+  50%      { box-shadow: 0 0 0 1px var(--accent), 0 0 22px 3px rgba(95, 212, 255, .28); }
+}
+
+/* --- 6. 操作の手応え -------------------------------------------------------- */
+.button, .tabs button, .deck-actions button, .pagination button, .icon-button, .text-link,
+.matchup-chip, .tactic-deck-choice, .top-deck { transition: transform .18s var(--spring), background .2s, color .2s, border-color .2s, box-shadow .25s; }
+.button:hover, .deck-actions button:hover, .pagination button:hover:not(:disabled) { transform: translateY(-2px); }
+.button:active, .tabs button:active, .deck-actions button:active,
+.pagination button:active, .icon-button:active, .matchup-chip:active { transform: scale(.96); }
+.icon-button:hover { transform: rotate(-8deg) scale(1.06); }
+
+/* ナビの現在地に光が差す */
+.desktop-nav .nav__item.is-active { animation: nav-pop .45s var(--spring) both; }
+@keyframes nav-pop { from { transform: scale(.9); } to { transform: none; } }
+.tabs button.is-active { animation: nav-pop .35s var(--spring) both; }
+
+/* 検索欄はフォーカスでリングが広がる */
+.search-control, .select-control input, .select-control select { transition: border-color .2s, box-shadow .3s var(--swift); }
+.search-control:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(95, 212, 255, .14); }
+.select-control input:focus, .select-control select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(95, 212, 255, .14); }
+
+/* 行のホバーは左へ滑らせる */
+.top-deck:hover { transform: translateX(4px); }
+.matchup-row { transition: background .2s, transform .2s var(--swift); }
+.matchup-row:hover { background: rgba(255, 255, 255, .035); transform: translateX(3px); }
+
+/* パネル自体もホバーで少し浮く */
+.deck-card, .card-stat, .synergy-card, .sequence-card, .tactic-deck-choice, .match-record {
+  transition: transform .25s var(--swift), background .25s, border-color .25s, box-shadow .25s;
+}
+.deck-card:hover, .card-stat:hover, .synergy-card:hover, .tactic-deck-choice:hover { transform: translateY(-3px); }
+
+/* --- 7. モーダル・トースト -------------------------------------------------- */
+.modal[open] .modal__sheet { animation: sheet-in .42s var(--spring) both; }
+@keyframes sheet-in { from { opacity: 0; transform: translateY(22px) scale(.97); } to { opacity: 1; transform: none; } }
+.modal[open]::backdrop { animation: fade-in .3s ease both; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.toast.is-visible { animation: toast-in .4s var(--spring) both; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 20px) scale(.94); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+
+/* 展開する詳細 */
+.match-more[open] .match-more__body { animation: unfold .4s var(--swift) both; }
+@keyframes unfold { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.match-more summary i { transition: transform .25s var(--spring); display: inline-block; }
+.match-more[open] summary i { transform: rotate(180deg); }
+
+/* --- 8. 認証画面 ------------------------------------------------------------ */
+.auth__panel > * { animation: rise .6s var(--spring) backwards; }
+.auth__panel > *:nth-child(2) { animation-delay: .06s; }
+.auth__panel > *:nth-child(3) { animation-delay: .12s; }
+.auth__panel > *:nth-child(4) { animation-delay: .18s; }
+.auth__panel > *:nth-child(5) { animation-delay: .24s; }
+.auth__panel > *:nth-child(n+6) { animation-delay: .3s; }
+.auth__visual .x-mark--large { animation: mark-float 7s ease-in-out infinite; }
+@keyframes mark-float {
+  0%, 100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  50%      { transform: translate(-50%, -54%) scale(1.03) rotate(3deg); }
+}
+.auth__orbit--one { animation: orbit 24s linear infinite; }
+.auth__orbit--two { animation: orbit 38s linear infinite reverse; }
+@keyframes orbit {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+#unlockButton.is-loading { animation: pulse-btn 1.1s ease-in-out infinite; }
+@keyframes pulse-btn { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
+
+/* --- 9. グラフ --------------------------------------------------------------- */
+.trend-line { stroke-dasharray: 2400; stroke-dashoffset: 2400; animation: draw-line 1.8s var(--swift) .25s both; }
+@keyframes draw-line { to { stroke-dashoffset: 0; } }
+.trend-bar { transform-origin: 50% 100%; animation: grow-bar .7s var(--swift) both; }
+@keyframes grow-bar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.trend-bar:nth-child(3n) { animation-delay: .06s; }
+.trend-bar:nth-child(3n+1) { animation-delay: .12s; }
+
+/* --- 10. 動きを減らす設定を尊重する（すべて停止） -------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .motion-item, .motion-group > *,
+  .deck-list > *, .card-stats-grid > *, .log-list > *, .synergy-grid > *, .sequence-list > * {
+    opacity: 1 !important; transform: none !important;
+  }
+  .trend-line { stroke-dashoffset: 0; }
+  .trend-bar { transform: none; }
+}
