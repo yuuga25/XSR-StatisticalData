@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070b1a">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="収穫アサルト R1 シミュレーション（累計1,000,000回）">
+  <title>収穫アサルト シミュレーション | Xross Stats</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="simulation.css">
+</head>
+<body class="sim-body">
+  <div class="backdrop" aria-hidden="true">
+    <div class="backdrop__mesh"></div>
+    <div class="backdrop__flare backdrop__flare--a"></div>
+    <div class="backdrop__flare backdrop__flare--b"></div>
+    <div class="backdrop__slashes"></div>
+  </div>
+
+  <header class="topbar">
+    <a class="brand-lockup brand-lockup--button" href="index.html" aria-label="対戦統計へ戻る">
+      <span class="x-mark"><i></i><i></i></span>
+      <span><strong>XROSS STATS</strong><small>SIMULATION</small></span>
+    </a>
+    <nav class="desktop-nav" aria-label="セクション">
+      <button class="nav__item is-active" type="button" data-jump="overview"><span>01</span><b>概要</b></button>
+      <button class="nav__item" type="button" data-jump="conditions"><span>02</span><b>条件比較</b></button>
+      <button class="nav__item" type="button" data-jump="paired"><span>03</span><b>ペア比較</b></button>
+      <button class="nav__item" type="button" data-jump="detail"><span>04</span><b>条件詳細</b></button>
+      <button class="nav__item" type="button" data-jump="integrity"><span>05</span><b>検証</b></button>
+    </nav>
+    <div class="topbar__context">
+      <div><span>ROUNDS</span><strong>1,000,000</strong></div>
+      <div><span>CONDITIONS</span><strong>29</strong></div>
+    </div>
+  </header>
+
+  <main class="main">
+    <section id="overview" class="sim-section">
+      <div class="hero motion-item">
+        <div class="hero__copy">
+          <p class="kicker">SIMULATION · ROUND 1</p>
+          <h2>収穫アサルト</h2>
+          <p id="heroLead" class="hero__lead"></p>
+        </div>
+        <div class="hero__signal" aria-hidden="true">
+          <div class="signal-ring"><span id="heroRounds">—</span><small>ROUNDS</small></div>
+          <div class="signal-lines"><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+      </div>
+
+      <div id="kpiGrid" class="kpi-grid motion-group"></div>
+
+      <div class="layout-two motion-group">
+        <article class="panel">
+          <div class="panel__head"><div><p class="kicker">RUN CONDITIONS</p><h3>実行条件</h3></div></div>
+          <div id="runConditions" class="sim-defs"></div>
+        </article>
+        <article class="panel">
+          <div class="panel__head"><div><p class="kicker">MATCHUPS</p><h3>対面別の到達点</h3></div><span class="panel__meta">TOTAL WIN RATE</span></div>
+          <div id="matchupSummary" class="sim-matchups"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="conditions" class="sim-section">
+      <div class="page-head motion-item">
+        <div><p class="kicker">CONDITION COMPARISON</p><h2>条件比較</h2><p>29条件すべての勝率・信頼区間・平均ターン</p></div>
+        <div class="count-badge"><span>ROWS</span><strong>29</strong></div>
+      </div>
+      <div class="control-bar motion-item">
+        <label class="search-control search-control--wide"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="condSearch" type="search" placeholder="対面・タクティクスで絞り込み"></label>
+        <label class="select-control"><span>並び順</span><select id="condSort">
+          <option value="winrate">総合勝率</option>
+          <option value="delta">追加分との差</option>
+          <option value="turns">平均ハーフターン</option>
+          <option value="pp">PPチケット使用率</option>
+          <option value="name">対面名</option>
+        </select></label>
+      </div>
+      <div id="condList" class="sim-cond-list motion-group"></div>
+      <article class="panel motion-item">
+        <div class="panel__head"><div><p class="kicker">FULL TABLE</p><h3>全21列</h3></div><span class="panel__meta">01_condition_comparison</span></div>
+        <div id="condTable" class="sim-table-wrap"></div>
+      </article>
+    </section>
+
+    <section id="paired" class="sim-section">
+      <div class="page-head motion-item">
+        <div><p class="kicker">PAIRED COMPARISON</p><h2>後攻ペア比較</h2><p>同じ seed・初期山札で アドレナリン と サイバネアーマー を突き合わせた結果</p></div>
+        <div class="count-badge"><span>GROUPS</span><strong id="pairedCount">—</strong></div>
+      </div>
+      <div id="pairedList" class="sim-paired-list motion-group"></div>
+      <article class="panel motion-item">
+        <div class="panel__head"><div><p class="kicker">FULL TABLE</p><h3>全13列</h3></div><span class="panel__meta">02_paired_tactic_comparison</span></div>
+        <div id="pairedTable" class="sim-table-wrap"></div>
+      </article>
+    </section>
+
+    <section id="detail" class="sim-section">
+      <div class="page-head motion-item">
+        <div><p class="kicker">CONDITION DETAIL</p><h2>条件詳細</h2><p>決着ターン・コンボ・リーサル・PPチケット・アドレナリン探索</p></div>
+        <div class="count-badge"><span>ROUNDS</span><strong id="detailRounds">—</strong></div>
+      </div>
+      <article class="panel motion-item">
+        <div class="panel__head"><div><p class="kicker">SELECT</p><h3>条件を選ぶ</h3></div><span class="panel__meta">29 CONDITIONS</span></div>
+        <div id="condPicker" class="sim-picker"></div>
+      </article>
+      <div id="detailPanels" class="motion-group"></div>
+    </section>
+
+    <section id="integrity" class="sim-section">
+      <div class="page-head motion-item">
+        <div><p class="kicker">VALIDATION</p><h2>検証・整合性</h2><p>実行記録とチェックサム</p></div>
+      </div>
+      <div id="integrityPanels" class="motion-group"></div>
+    </section>
+  </main>
+
+  <script src="sim-data.js"></script>
+  <script src="simulation.js"></script>
+</body>
+</html>
