@@ -1,0 +1,2 @@
+run_id 31100974565 failure
+https://github.com/yuuga25/XSR-StatisticalData/actions/runs/31100974565
