@@ -35,7 +35,8 @@
     { key: 'cards', index: '03', title: 'CARD PERFORMANCE', label: 'カード統計' },
     { key: 'tactics', index: '04', title: 'TACTICS ORDER', label: '戦術構成' },
     { key: 'matchup', index: '05', title: 'MATCHUP & SYNERGY', label: '対面・相性' },
-    { key: 'logs', index: '06', title: 'MATCH RECORDS', label: '対戦ログ' }
+    { key: 'simulation', index: '06', title: 'SIMULATION', label: 'シミュレーション' },
+    { key: 'logs', index: '07', title: 'MATCH RECORDS', label: '対戦ログ' }
   ];
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -201,6 +202,8 @@
       if (elements.rememberSession.checked) sessionStorage.setItem(SESSION_KEY, password);
       else sessionStorage.removeItem(SESSION_KEY);
       loadData(data);
+      // シミュレーション結果（sim.enc）も同じパスワードで復号する
+      window.XROSS_SIM?.load?.(password);
       elements.authScreen.hidden = true;
       elements.app.hidden = false;
       document.body.classList.add('is-unlocked');

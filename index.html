@@ -66,7 +66,8 @@
         <button class="nav__item" type="button" data-view="cards"><span>03</span><b>カード</b></button>
         <button class="nav__item" type="button" data-view="tactics"><span>04</span><b>戦術</b></button>
         <button class="nav__item" type="button" data-view="matchup"><span>05</span><b>対面</b></button>
-        <button class="nav__item" type="button" data-view="logs"><span>06</span><b>対戦ログ</b></button>
+        <button class="nav__item" type="button" data-view="simulation"><span>06</span><b>シミュ</b></button>
+        <button class="nav__item" type="button" data-view="logs"><span>07</span><b>対戦ログ</b></button>
       </nav>
       <div class="topbar__context">
         <div><span>PERIOD</span><strong id="topPeriod">—</strong></div>
@@ -86,7 +87,8 @@
         <button class="nav__item" type="button" data-view="cards"><span class="nav__number">03</span><span><b>カード統計</b><small>Card performance</small></span></button>
         <button class="nav__item" type="button" data-view="tactics"><span class="nav__number">04</span><span><b>戦術構成</b><small>Tactics order</small></span></button>
         <button class="nav__item" type="button" data-view="matchup"><span class="nav__number">05</span><span><b>対面・相性</b><small>Matchup &amp; synergy</small></span></button>
-        <button class="nav__item" type="button" data-view="logs"><span class="nav__number">06</span><span><b>対戦ログ</b><small>Match records</small></span></button>
+        <button class="nav__item" type="button" data-view="simulation"><span class="nav__number">06</span><span><b>シミュレーション</b><small>Harvest assault</small></span></button>
+        <button class="nav__item" type="button" data-view="logs"><span class="nav__number">07</span><span><b>対戦ログ</b><small>Match records</small></span></button>
       </nav>
       <div class="sidebar__status"><i></i><span><b>DATA ONLINE</b><small id="sidebarGames">—</small></span></div>
     </aside>
@@ -98,7 +100,8 @@
       <button type="button" data-view="cards"><span>03</span><b>カード</b></button>
       <button type="button" data-view="tactics"><span>04</span><b>戦術</b></button>
       <button type="button" data-view="matchup"><span>05</span><b>対面</b></button>
-      <button type="button" data-view="logs"><span>06</span><b>ログ</b></button>
+      <button type="button" data-view="simulation"><span>06</span><b>シミュ</b></button>
+      <button type="button" data-view="logs"><span>07</span><b>ログ</b></button>
     </nav>
 
     <main id="mainContent" class="main">
@@ -212,6 +215,23 @@
         </div>
       </section>
 
+      <section class="view" data-view-panel="simulation">
+        <div class="page-head motion-item">
+          <div><p class="kicker">SIMULATION · ROUND 1</p><h2>収穫アサルト</h2><p id="simLead">シミュレーション結果</p></div>
+          <div id="simCountBadge" class="count-badge"><span>ROUNDS</span><strong>—</strong></div>
+        </div>
+        <div class="control-bar motion-item">
+          <div id="simTabs" class="tabs">
+            <button class="is-active" type="button" data-sim-tab="overview">概要</button>
+            <button type="button" data-sim-tab="conditions">条件比較</button>
+            <button type="button" data-sim-tab="paired">ペア比較</button>
+            <button type="button" data-sim-tab="detail">条件詳細</button>
+            <button type="button" data-sim-tab="integrity">検証</button>
+          </div>
+        </div>
+        <div id="simPanes" class="motion-group"></div>
+      </section>
+
       <section class="view" data-view-panel="logs">
         <div class="page-head motion-item"><div><p class="kicker">MATCH LOG</p><h2>対戦ログ</h2><p>構成とラウンド結果を試合ごとに比較</p></div><div id="logCountBadge" class="count-badge"><span>RESULT</span><strong>—</strong></div></div>
         <div class="control-bar log-filter-bar motion-item">
@@ -242,6 +262,6 @@
 
   <dialog id="modal" class="modal"><button class="modal__scrim" type="button" data-close-modal aria-label="閉じる"></button><div class="modal__sheet"><button class="modal__close" type="button" data-close-modal aria-label="閉じる">×</button><div id="modalContent"></div></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="card-map.js"></script><script src="app.js"></script>
+  <script src="card-map.js"></script><script src="app.js"></script><script src="simulation.js"></script>
 </body>
 </html>
